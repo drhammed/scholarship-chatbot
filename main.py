@@ -1,4 +1,5 @@
 import os
+import re
 import streamlit as st
 from langchain.chains import LLMChain
 from langchain_core.prompts import (
@@ -9,6 +10,11 @@ from langchain_core.prompts import (
 from langchain_core.messages import SystemMessage
 from langchain.chains.conversation.memory import ConversationBufferWindowMemory
 from langchain_groq import ChatGroq
+
+def make_clickable_links(text):
+    # Find all URLs in the text and convert them to clickable hyperlinks
+    url_pattern = re.compile(r'(https?://\S+)')
+    return url_pattern.sub(r'<a href="\1" target="_blank">\1</a>', text)
 
 def main():
     """
@@ -106,7 +112,8 @@ Please ensure this process is followed for all guidance and support calls.
         if sender == "User":
             st.markdown(f"<div style='color: blue;'><strong>{sender}:</strong> {message}</div>", unsafe_allow_html=True)
         else:
-            st.markdown(f"<div style='color: green;'><strong>{sender}:</strong> {message}</div>", unsafe_allow_html=True)
+            message_with_links = make_clickable_links(message)
+            st.markdown(f"<div style='color: green;'><strong>{sender}:</strong> {message_with_links}</div>", unsafe_allow_html=True)
 
     # Input field for user question
     if 'user_input' not in st.session_state:
@@ -144,6 +151,12 @@ Please ensure this process is followed for all guidance and support calls.
             # Update chat history
             st.session_state.chat_history.append(("User", user_question))
             st.session_state.chat_history.append(("Chatbot", response))
+
+            # Clear the input field by resetting session state
+            st.session_state.user_input = ""
+
+            # Rerun the script to display the updated chat history and input field
+            st.experimental_rerun()
 
 if __name__ == "__main__":
     main()
