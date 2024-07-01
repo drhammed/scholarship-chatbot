@@ -1,7 +1,33 @@
-import os
-import re
+#pip install langchain_voyageai
+#!pip install langchain_openai
+#!pip install langchain_pinecone
+#pip install groq
+#!pip install langchain_groq
+
 import streamlit as st
-from langchain.chains import LLMChain
+from langchain_voyageai import VoyageAIEmbeddings
+import os
+import json
+import boto3
+from dotenv import load_dotenv
+from urllib.parse import urlparse
+from pinecone import Pinecone
+import pinecone
+from langchain_openai import ChatOpenAI
+import openai
+from groq import Groq
+from langchain.chains import LLMChain, RetrievalQA
+import time
+import re
+import warnings
+from langchain_pinecone import PineconeVectorStore
+from langchain.memory import ConversationBufferMemory
+from langchain.schema import HumanMessage
+from langchain.prompts import ChatPromptTemplate
+from langchain.chains import ConversationChain
+from langchain_core.output_parsers import StrOutputParser
+from langchain_core.runnables import RunnablePassthrough
+from langchain_core.runnables.base import Runnable
 from langchain_core.prompts import (
     ChatPromptTemplate,
     HumanMessagePromptTemplate,
@@ -10,6 +36,9 @@ from langchain_core.prompts import (
 from langchain_core.messages import SystemMessage
 from langchain.chains.conversation.memory import ConversationBufferWindowMemory
 from langchain_groq import ChatGroq
+import uuid
+
+
 
 def make_clickable_links(text):
     # Find all URLs in the text and convert them to clickable hyperlinks
