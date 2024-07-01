@@ -20,7 +20,6 @@ def main():
     st.write("Hello! I'm your friendly chatbot. I'm here to help answer your questions regarding scholarships and funding for students, and provide information. I'm also super fast! Let's start!")
 
     # Get Groq API key from environment variable
-    #groq_api_key = os.getenv('GROQ_API_KEY')
     GROQ_API_KEY = st.secrets["api_keys"]["GROQ_API_KEY"]
     model = 'llama3-70b-8192'
 
@@ -110,7 +109,10 @@ Please ensure this process is followed for all guidance and support calls.
             st.markdown(f"<div style='color: green;'><strong>{sender}:</strong> {message}</div>", unsafe_allow_html=True)
 
     # Input field for user question
-    user_question = st.text_input("Ask a question:", key="user_input", value="", max_chars=100, help="Type your question here and press Enter or click Send.")
+    if 'user_input' not in st.session_state:
+        st.session_state.user_input = ""
+
+    user_question = st.text_input("Ask a question:", key="user_input", value=st.session_state.user_input, max_chars=100, help="Type your question here and press Enter or click Send.")
 
     if st.button("Send"):
         if user_question:
@@ -143,7 +145,7 @@ Please ensure this process is followed for all guidance and support calls.
             st.session_state.chat_history.append(("User", user_question))
             st.session_state.chat_history.append(("Chatbot", response))
 
-            # Clear the input field by setting it to an empty string
+            # Clear the input field by resetting session state
             st.session_state.user_input = ""
 
             # Rerun the script to display the updated chat history and input field
