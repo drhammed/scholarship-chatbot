@@ -102,8 +102,15 @@ Please ensure this process is followed for all guidance and support calls.
     if 'chat_history' not in st.session_state:
         st.session_state.chat_history = []
 
+    # Display chat history
+    for sender, message in st.session_state.chat_history:
+        if sender == "User":
+            st.markdown(f"<div style='color: blue;'><strong>{sender}:</strong> {message}</div>", unsafe_allow_html=True)
+        else:
+            st.markdown(f"<div style='color: green;'><strong>{sender}:</strong> {message}</div>", unsafe_allow_html=True)
+
     # Input field for user question
-    user_question = st.text_input("Ask a question:", key="user_input")
+    user_question = st.text_input("Ask a question:", key="user_input", value="", max_chars=100, help="Type your question here and press Enter or click Send.")
 
     if st.button("Send"):
         if user_question:
@@ -136,12 +143,11 @@ Please ensure this process is followed for all guidance and support calls.
             st.session_state.chat_history.append(("User", user_question))
             st.session_state.chat_history.append(("Chatbot", response))
 
-            # Display chat history
-            for sender, message in st.session_state.chat_history:
-                if sender == "User":
-                    st.markdown(f"**{sender}:** {message}")
-                else:
-                    st.markdown(f"**{sender}:** {message}")
+            # Clear the input field by setting it to an empty string
+            st.session_state.user_input = ""
+
+            # Rerun the script to display the updated chat history and input field
+            st.experimental_rerun()
 
 if __name__ == "__main__":
     main()
