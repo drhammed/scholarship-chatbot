@@ -13,7 +13,7 @@ from langchain_groq import ChatGroq
 
 def make_clickable_links(text):
     # Find all URLs in the text and convert them to clickable hyperlinks
-    url_pattern = re.compile(r'(https?://\S+)')
+    url_pattern = re.compile(r'(https?://\S+?)(?=\s|$|\)|\]|\.|,)')
     return url_pattern.sub(r'<a href="\1" target="_blank">\1</a>', text)
 
 def main():
@@ -94,8 +94,6 @@ User: "Yes"
 Assistant: "Proceeding with detailed guidance."
 
 If the user responds with "Yes," proceed with providing detailed guidance. If the user responds with "No" or requests changes at any step, update the data and seek confirmation again.
-
-Please ensure this process is followed for all guidance and support calls.
 """
     conversational_memory_length = 5  # number of previous messages the chatbot will remember during the conversation
 
