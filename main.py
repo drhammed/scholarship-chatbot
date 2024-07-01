@@ -145,11 +145,5 @@ Please ensure this process is followed for all guidance and support calls.
             st.session_state.chat_history.append(("User", user_question))
             st.session_state.chat_history.append(("Chatbot", response))
 
-            # Clear the input field by resetting session state
-            st.session_state.user_input = ""
-
-            # Rerun the script to display the updated chat history and input field
-            st.experimental_rerun()
-
 if __name__ == "__main__":
     main()
