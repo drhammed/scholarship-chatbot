@@ -13,7 +13,7 @@ from langchain_groq import ChatGroq
 
 def make_clickable_links(text):
     # Find all URLs in the text and convert them to clickable hyperlinks
-    url_pattern = re.compile(r'(https?://\S+')
+    url_pattern = re.compile(r'(https?://\S+)')
     return url_pattern.sub(r'<a href="\1" target="_blank">\1</a>', text)
 
 def main():
