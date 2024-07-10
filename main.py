@@ -128,7 +128,7 @@ If the user responds with "Yes," proceed with providing detailed guidance. If th
 
 Please ensure this process is followed for all guidance and support calls.
 """
-    conversational_memory_length = 5
+    conversational_memory_length = 10
 
     memory = ConversationBufferWindowMemory(k=conversational_memory_length,
                                             memory_key="chat_history",
@@ -144,6 +144,10 @@ Please ensure this process is followed for all guidance and support calls.
         else:
             message_with_links = make_clickable_links(message)
             st.markdown(f"<div style='color: green;'><strong>{sender}:</strong> {message_with_links}</div>", unsafe_allow_html=True)
+            
+    
+    if 'user_input' not in st.session_state:
+        st.session_state.user_input = ''
 
     user_question = st.text_input("Ask a question:", key="user_input")
 
@@ -170,6 +174,9 @@ Please ensure this process is followed for all guidance and support calls.
                     response = "Sorry, I'm having trouble processing your request right now. Please try again later."
             st.session_state.chat_history.append(("User", user_question))
             st.session_state.chat_history.append(("Chatbot", response))
+            
+            #clear the chat input field
+            st.session_state.user_input = '' 
             
             #st.experimental_rerun()
             st.rerun()
