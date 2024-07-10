@@ -29,7 +29,7 @@ from langchain_core.prompts import (
 )
 from langchain_core.messages import SystemMessage
 from langchain.chains.conversation.memory import ConversationBufferWindowMemory
-## from langchain_groq import ChatGroq
+from langchain_groq import ChatGroq
 import uuid
 
 def make_clickable_links(text):
@@ -164,7 +164,7 @@ If the user responds with "Yes," proceed with providing detailed guidance. If th
                 ])
             
             conversation = LLMChain(
-                llm=openai_chat,
+                llm=groq_chat,
                 prompt=prompt,
                 verbose=False,
                 memory=memory,
