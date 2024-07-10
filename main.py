@@ -49,7 +49,7 @@ def main():
     ## model = 'llama3-70b-8192'
 
     # Initialize OpenAI Langchain chat object and conversation
-    openai_chat = ChatOpenAI(api_key=OPENAI_API_KEY, model_name="gpt-4o", temperature=0.02)
+    openai_chat = ChatOpenAI(api_key=OPENAI_API_KEY, model_name="gpt-4", temperature=0.02)
 
     ## # Initialize Groq Langchain chat object and conversation
     ## groq_chat = ChatGroq(groq_api_key=GROQ_API_KEY, model_name=model, temperature=0.02)
