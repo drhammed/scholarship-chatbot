@@ -71,6 +71,7 @@ def main():
 
 5. **Application Support**:
    - Following user confirmation, offer support in the application process.
+   - Don't go back to the begining. Ask the user if they want info on how to apply and then proceed to next step here
    - Provide templates or examples for personal statements, resumes, and other required documents.
    - Assist in organizing and tracking application deadlines and requirements.
 
