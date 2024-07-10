@@ -147,7 +147,7 @@ Please ensure this process is followed for all guidance and support calls.
             
     
     if 'user_question' not in st.session_state:
-        st.session_state.user_input = ''
+        st.session_state.user_question = ''
 
     user_question = st.text_input("Ask a question:", key="user_question")
 
