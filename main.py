@@ -145,41 +145,42 @@ Please ensure this process is followed for all guidance and support calls.
             message_with_links = make_clickable_links(message)
             st.markdown(f"<div style='color: green;'><strong>{sender}:</strong> {message_with_links}</div>", unsafe_allow_html=True)
             
-    
-    if 'user_input' not in st.session_state:
-        st.session_state.user_input = ''
 
-    user_question = st.text_input("Ask a question:", key="user_input")
+def clear_input():
+    st.session_state.user_input = ''
 
-    if st.button("Send"):
-        if user_question:
-            prompt = ChatPromptTemplate.from_messages([
-                SystemMessage(content=system_prompt),
-                MessagesPlaceholder(variable_name="chat_history"),
-                HumanMessagePromptTemplate.from_template("{human_input}"),
-            ])
+if 'user_input' not in st.session_state:
+    st.session_state.user_input = ''
 
-            conversation = LLMChain(
-                llm=groq_chat,
-                prompt=prompt,
-                verbose=False,
-                memory=memory,
-            )
+user_question = st.text_input("Ask a question:", key="user_input")
 
-            with st.spinner("Thinking..."):
-                try:
-                    response = conversation.predict(human_input=user_question)
-                except Exception as e:
-                    st.error(f"An error occurred: {str(e)}")
-                    response = "Sorry, I'm having trouble processing your request right now. Please try again later."
-            st.session_state.chat_history.append(("User", user_question))
-            st.session_state.chat_history.append(("Chatbot", response))
-            
-            #clear the chat input field
-            st.session_state.user_input = '' 
-            
-            #st.experimental_rerun()
-            st.rerun()
+def submit():
+    if user_question:
+        prompt = ChatPromptTemplate.from_messages([
+            SystemMessage(content=system_prompt),
+            MessagesPlaceholder(variable_name="chat_history"),
+            HumanMessagePromptTemplate.from_template("{human_input}"),
+        ])
 
-if __name__ == "__main__":
-    main()
+        conversation = LLMChain(
+            llm=groq_chat,
+            prompt=prompt,
+            verbose=False,
+            memory=memory,
+        )
+
+        with st.spinner("Thinking..."):
+            try:
+                response = conversation.predict(human_input=user_question)
+            except Exception as e:
+                st.error(f"An error occurred: {str(e)}")
+                response = "Sorry, I'm having trouble processing your request right now. Please try again later."
+        st.session_state.chat_history.append(("User", user_question))
+        st.session_state.chat_history.append(("Chatbot", response))
+        
+        clear_input()  # Clear the input field
+
+        st.rerun()
+
+if st.button("Send", on_click=submit):
+    pass
