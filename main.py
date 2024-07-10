@@ -1,9 +1,3 @@
-#pip install langchain_voyageai
-#!pip install langchain_openai
-#!pip install langchain_pinecone
-#pip install groq
-#!pip install langchain_groq
-
 import streamlit as st
 from langchain_voyageai import VoyageAIEmbeddings
 import os
@@ -38,21 +32,11 @@ from langchain.chains.conversation.memory import ConversationBufferWindowMemory
 from langchain_groq import ChatGroq
 import uuid
 
-
-
 def make_clickable_links(text):
-    # Find all URLs in the text and convert them to clickable hyperlinks
-    #url_pattern = re.compile(r'(https?://\S+)')
-    #return url_pattern.sub(r'<a href="\1" target="_blank">\1</a>', text)
     url_pattern = re.compile(r'(https?://[^\s\)\]]+)')
     return url_pattern.sub(r'<a href="\1" target="_blank">\1</a>', text)
 
 def main():
-    """
-    This function is the main entry point of the application. It sets up the Groq client, the Streamlit interface, and handles the chat interaction.
-    """
-
-    # Set up Streamlit interface
     st.title("Scholarship Chatbot by drhammed")
     st.write("Hello! I'm your friendly chatbot. I'm here to help answer your questions regarding scholarships and funding for students, and provide information. I'm also super fast! Let's start!")
 
@@ -125,8 +109,6 @@ User: "Yes"
 Assistant: "Proceeding with detailed guidance."
 
 If the user responds with "Yes," proceed with providing detailed guidance. If the user responds with "No" or requests changes at any step, update the data and seek confirmation again.
-
-Please ensure this process is followed for all guidance and support calls.
 """
     conversational_memory_length = 10
 
@@ -145,45 +127,45 @@ Please ensure this process is followed for all guidance and support calls.
             message_with_links = make_clickable_links(message)
             st.markdown(f"<div style='color: green;'><strong>{sender}:</strong> {message_with_links}</div>", unsafe_allow_html=True)
             
+    def clear_input():
+        st.session_state.user_input = ''
 
-def clear_input():
-    st.session_state.user_input = ''
+    if 'user_input' not in st.session_state:
+        st.session_state.user_input = ''
 
-if 'user_input' not in st.session_state:
-    st.session_state.user_input = ''
+    user_question = st.text_input("Ask a question:", key="user_input")
 
-user_question = st.text_input("Ask a question:", key="user_input")
+    def submit(system_prompt, groq_chat, memory):
+        if user_question:
+            prompt = ChatPromptTemplate.from_messages([
+                SystemMessage(content=system_prompt),
+                MessagesPlaceholder(variable_name="chat_history"),
+                HumanMessagePromptTemplate.from_template("{human_input}"),
+            ])
 
-def submit():
-    if user_question:
-        prompt = ChatPromptTemplate.from_messages([
-            SystemMessage(content=system_prompt),
-            MessagesPlaceholder(variable_name="chat_history"),
-            HumanMessagePromptTemplate.from_template("{human_input}"),
-        ])
+            conversation = LLMChain(
+                llm=groq_chat,
+                prompt=prompt,
+                verbose=False,
+                memory=memory,
+            )
 
-        conversation = LLMChain(
-            llm=groq_chat,
-            prompt=prompt,
-            verbose=False,
-            memory=memory,
-        )
+            with st.spinner("Thinking..."):
+                try:
+                    response = conversation.predict(human_input=user_question)
+                except Exception as e:
+                    st.error(f"An error occurred: {str(e)}")
+                    response = "Sorry, I'm having trouble processing your request right now. Please try again later."
+            st.session_state.chat_history.append(("User", user_question))
+            st.session_state.chat_history.append(("Chatbot", response))
+            
+            clear_input()  # Clear the input field
 
-        with st.spinner("Thinking..."):
-            try:
-                response = conversation.predict(human_input=user_question)
-            except Exception as e:
-                st.error(f"An error occurred: {str(e)}")
-                response = "Sorry, I'm having trouble processing your request right now. Please try again later."
-        st.session_state.chat_history.append(("User", user_question))
-        st.session_state.chat_history.append(("Chatbot", response))
-        
-        clear_input()  # Clear the input field
+            st.rerun()
 
-        st.rerun()
-
-if st.button("Send", on_click=submit):
-    pass
+    if st.button("Send", on_click=submit, args=(system_prompt, groq_chat, memory)):
+        pass
 
 if __name__ == "__main__":
     main()
+
