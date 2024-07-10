@@ -161,8 +161,8 @@ If the user responds with "Yes," proceed with providing detailed guidance. If th
             
             clear_input()  # Clear the input field
             
-            st.experimental_rerun()
-            #st.rerun()
+            #st.experimental_rerun()
+            st.rerun()
 
     if st.button("Send", on_click=submit, args=(system_prompt, groq_chat, memory)):
         pass
