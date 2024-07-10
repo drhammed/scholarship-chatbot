@@ -184,3 +184,6 @@ def submit():
 
 if st.button("Send", on_click=submit):
     pass
+
+if __name__ == "__main__":
+    main()
