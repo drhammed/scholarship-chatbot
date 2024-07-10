@@ -147,7 +147,7 @@ Please ensure this process is followed for all guidance and support calls.
             
     
     if 'user_input' not in st.session_state:
-        st.session_state.user_input = []
+        st.session_state.user_input = '.'
 
     user_question = st.text_input("Ask a question:", key="user_input")
 
@@ -176,7 +176,7 @@ Please ensure this process is followed for all guidance and support calls.
             st.session_state.chat_history.append(("Chatbot", response))
             
             #clear the chat input field
-            st.session_state.user_input = [] 
+            st.session_state.user_input = '.' 
             
             #st.experimental_rerun()
             st.rerun()
