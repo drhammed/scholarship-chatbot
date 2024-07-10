@@ -9,7 +9,7 @@ from pinecone import Pinecone
 import pinecone
 from langchain_openai import ChatOpenAI
 import openai
-from groq import Groq
+## from groq import Groq
 from langchain.chains import LLMChain, RetrievalQA
 import time
 import re
@@ -29,7 +29,7 @@ from langchain_core.prompts import (
 )
 from langchain_core.messages import SystemMessage
 from langchain.chains.conversation.memory import ConversationBufferWindowMemory
-from langchain_groq import ChatGroq
+## from langchain_groq import ChatGroq
 import uuid
 
 def make_clickable_links(text):
@@ -40,12 +40,19 @@ def main():
     st.title("Scholarship Chatbot by drhammed")
     st.write("Hello! I'm your friendly chatbot. I'm here to help answer your questions regarding scholarships and funding for students, and provide information. I'm also super fast! Let's start!")
 
-    # Get Groq API key from environment variable
-    GROQ_API_KEY = st.secrets["api_keys"]["GROQ_API_KEY"]
-    model = 'llama3-70b-8192'
+    # Get OpenAI API key from environment variable
+    OPENAI_API_KEY = st.secrets["api_keys"]["OPENAI_API_KEY"]
+    openai.api_key = OPENAI_API_KEY
 
-    # Initialize Groq Langchain chat object and conversation
-    groq_chat = ChatGroq(groq_api_key=GROQ_API_KEY, model_name=model, temperature=0.02)
+    ## # Get Groq API key from environment variable
+    ## GROQ_API_KEY = st.secrets["api_keys"]["GROQ_API_KEY"]
+    ## model = 'llama3-70b-8192'
+
+    # Initialize OpenAI Langchain chat object and conversation
+    openai_chat = ChatOpenAI(api_key=OPENAI_API_KEY, model_name="gpt-4o", temperature=0.02)
+
+    ## # Initialize Groq Langchain chat object and conversation
+    ## groq_chat = ChatGroq(groq_api_key=GROQ_API_KEY, model_name=model, temperature=0.02)
 
     system_prompt = """
     Your primary tasks involve providing scholarship and funding information for users. Follow these steps for each task:
@@ -157,7 +164,7 @@ If the user responds with "Yes," proceed with providing detailed guidance. If th
                 ])
             
             conversation = LLMChain(
-                llm=groq_chat,
+                llm=openai_chat,
                 prompt=prompt,
                 verbose=False,
                 memory=memory,
