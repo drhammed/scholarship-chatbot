@@ -70,7 +70,7 @@ def main():
 
 5. **Application Support**:
    - Following user confirmation, offer support in the application process.
-   - Don't go back to the begining. Ask the user if they want info on how to apply and then proceed to next step here
+   - Don't go back to the beginning. Ask the user if they want info on how to apply and then proceed to the next step here
    - Provide templates or examples for personal statements, resumes, and other required documents.
    - Assist in organizing and tracking application deadlines and requirements.
 
@@ -120,6 +120,9 @@ If the user responds with "Yes," proceed with providing detailed guidance. If th
     if 'chat_history' not in st.session_state:
         st.session_state.chat_history = []
 
+    if 'conversation_state' not in st.session_state:
+        st.session_state.conversation_state = "start"
+
     st.write("### Chat History")
     for sender, message in st.session_state.chat_history:
         if sender == "User":
@@ -138,12 +141,21 @@ If the user responds with "Yes," proceed with providing detailed guidance. If th
 
     def submit():
         if st.session_state.user_input:
-            prompt = ChatPromptTemplate.from_messages([
-                SystemMessage(content=system_prompt),
-                MessagesPlaceholder(variable_name="chat_history"),
-                HumanMessagePromptTemplate.from_template("{human_input}"),
-            ])
+            if st.session_state.conversation_state == "start":
+                prompt = ChatPromptTemplate.from_messages([
+                    SystemMessage(content=system_prompt),
+                    MessagesPlaceholder(variable_name="chat_history"),
+                    HumanMessagePromptTemplate.from_template("{human_input}"),
+                ])
 
+            elif st.session_state.conversation_state == "awaiting_confirmation":
+                prompt = ChatPromptTemplate.from_messages([
+                    SystemMessage(content=system_prompt),
+                    MessagesPlaceholder(variable_name="chat_history"),
+                    HumanMessagePromptTemplate.from_template("{human_input}"),
+                    HumanMessagePromptTemplate.from_template("The user has confirmed the scholarships. Proceed with application guidance."),
+                ])
+            
             conversation = LLMChain(
                 llm=groq_chat,
                 prompt=prompt,
@@ -154,9 +166,14 @@ If the user responds with "Yes," proceed with providing detailed guidance. If th
             with st.spinner("Thinking..."):
                 try:
                     response = conversation.predict(human_input=st.session_state.user_input)
+                    if "Do you confirm the above data?" in response:
+                        st.session_state.conversation_state = "awaiting_confirmation"
+                    elif "Proceeding with detailed guidance" in response:
+                        st.session_state.conversation_state = "providing_guidance"
                 except Exception as e:
                     st.error(f"An error occurred: {str(e)}")
                     response = "Sorry, I'm having trouble processing your request right now. Please try again later."
+
             st.session_state.chat_history.append(("User", st.session_state.user_input))
             st.session_state.chat_history.append(("Chatbot", response))
             
