@@ -170,6 +170,9 @@ Please ensure this process is followed for all guidance and support calls.
                     response = "Sorry, I'm having trouble processing your request right now. Please try again later."
             st.session_state.chat_history.append(("User", user_question))
             st.session_state.chat_history.append(("Chatbot", response))
+            
+            #clear the user input
+            st.session_state.user_input = ""
             #st.experimental_rerun()
             st.rerun()
 
