@@ -32,7 +32,6 @@ from langchain.chains.conversation.memory import ConversationBufferWindowMemory
 from langchain_groq import ChatGroq
 import uuid
 
-
 def make_clickable_links(text):
     url_pattern = re.compile(r'(https?://[^\s\)\]]+)')
     return url_pattern.sub(r'<a href="\1" target="_blank">\1</a>', text)
@@ -137,8 +136,8 @@ If the user responds with "Yes," proceed with providing detailed guidance. If th
     
     user_question = st.text_input("Ask a question:", key="user_input")
 
-    def submit(system_prompt, groq_chat, memory):
-        if user_question:
+    def submit():
+        if st.session_state.user_input:
             prompt = ChatPromptTemplate.from_messages([
                 SystemMessage(content=system_prompt),
                 MessagesPlaceholder(variable_name="chat_history"),
@@ -154,18 +153,18 @@ If the user responds with "Yes," proceed with providing detailed guidance. If th
 
             with st.spinner("Thinking..."):
                 try:
-                    response = conversation.predict(human_input=user_question)
+                    response = conversation.predict(human_input=st.session_state.user_input)
                 except Exception as e:
                     st.error(f"An error occurred: {str(e)}")
                     response = "Sorry, I'm having trouble processing your request right now. Please try again later."
-            st.session_state.chat_history.append(("User", user_question))
+            st.session_state.chat_history.append(("User", st.session_state.user_input))
             st.session_state.chat_history.append(("Chatbot", response))
             
             clear_input()  # Clear the input field
             # Trigger a state change
             st.session_state.update_state = not st.session_state.get("update_state", False)
 
-    if st.button("Send", on_click=submit, args=(system_prompt, groq_chat, memory)):
+    if st.button("Send", on_click=submit):
         pass
 
 if __name__ == "__main__":
