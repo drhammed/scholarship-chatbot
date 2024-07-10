@@ -172,7 +172,7 @@ Please ensure this process is followed for all guidance and support calls.
             st.session_state.chat_history.append(("Chatbot", response))
             
             #clear the user input
-            st.session_state.user_input = ""
+            st.session_state["user_input"] = ""
             #st.experimental_rerun()
             st.rerun()
 
