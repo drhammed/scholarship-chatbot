@@ -32,6 +32,7 @@ from langchain.chains.conversation.memory import ConversationBufferWindowMemory
 from langchain_groq import ChatGroq
 import uuid
 
+
 def make_clickable_links(text):
     url_pattern = re.compile(r'(https?://[^\s\)\]]+)')
     return url_pattern.sub(r'<a href="\1" target="_blank">\1</a>', text)
@@ -132,7 +133,7 @@ If the user responds with "Yes," proceed with providing detailed guidance. If th
 
     if 'user_input' not in st.session_state:
         st.session_state.user_input = ''
-
+    
     user_question = st.text_input("Ask a question:", key="user_input")
 
     def submit(system_prompt, groq_chat, memory):
@@ -160,13 +161,11 @@ If the user responds with "Yes," proceed with providing detailed guidance. If th
             st.session_state.chat_history.append(("Chatbot", response))
             
             clear_input()  # Clear the input field
-            
-            #st.experimental_rerun()
-            st.rerun()
+            # Trigger a state change
+            st.session_state.update_state = not st.session_state.get("update_state", False)
 
     if st.button("Send", on_click=submit, args=(system_prompt, groq_chat, memory)):
         pass
 
 if __name__ == "__main__":
     main()
-
