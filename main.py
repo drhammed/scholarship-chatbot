@@ -146,10 +146,10 @@ Please ensure this process is followed for all guidance and support calls.
             st.markdown(f"<div style='color: green;'><strong>{sender}:</strong> {message_with_links}</div>", unsafe_allow_html=True)
             
     
-    if 'user_input' not in st.session_state:
+    if 'user_question' not in st.session_state:
         st.session_state.user_input = ''
 
-    user_question = st.text_input("Ask a question:", key="user_input")
+    user_question = st.text_input("Ask a question:", key="user_question")
 
     if st.button("Send"):
         if user_question:
@@ -176,7 +176,7 @@ Please ensure this process is followed for all guidance and support calls.
             st.session_state.chat_history.append(("Chatbot", response))
             
             #clear the chat input field
-            st.session_state.user_input = '' 
+            st.session_state.user_question = '' 
             
             #st.experimental_rerun()
             st.rerun()
