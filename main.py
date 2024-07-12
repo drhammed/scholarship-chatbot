@@ -29,13 +29,11 @@ st.write("Hello! I'm your friendly chatbot. I'm here to help answer your questio
 # Load environment variables from .env file
 load_dotenv()
 
-# Initialize Pinecone
-PINECONE_API_KEY = os.getenv('My_Pinecone_API_key')
-# Initialize OpenAI
-OPENAI_API_KEY = os.getenv('My_OpenAI_API_key')
+#OpenAI model
+OPENAI_API_KEY = st.secrets["api_keys"]["OPENAI_API_KEY"]
 
 # Initialize OpenAI model
-llm = ChatOpenAI(model="gpt-4o", temperature=0, max_tokens=None, timeout=None, max_retries=2, api_key=OPENAI_API_KEY)
+llm_mod = ChatOpenAI(model="gpt-4o", temperature=0, max_tokens=None, timeout=None, max_retries=2, api_key=OPENAI_API_KEY)
 
 system_prompt = """
 Your primary tasks involve providing scholarship and funding information for users. Follow these steps for each task:
@@ -187,7 +185,7 @@ if user_input:
     ])
 
     conversation = LLMChain(
-        llm=llm,
+        llm=llm_mod,
         prompt=prompt,
         verbose=False,
         memory=memory,
