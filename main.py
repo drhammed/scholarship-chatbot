@@ -129,6 +129,12 @@ if 'sessions' not in st.session_state:
 if 'current_session_name' not in st.session_state:
     st.session_state['current_session_name'] = None
 
+if 'user_input' not in st.session_state:
+    st.session_state['user_input'] = ''
+
+if 'conversation_state' not in st.session_state:
+    st.session_state['conversation_state'] = "start"
+
 # Function to get today's date in a readable format
 def get_readable_date():
     return datetime.now().strftime("%Y-%m-%d")
@@ -204,23 +210,16 @@ if user_input:
         memory=memory,
     )
 
-    # with st.spinner("Thinking..."):
-    #     try:
-    #         response = conversation.predict(human_input=user_input, chat_history=st.session_state['messages'])
-    #     except Exception as e:
-    #         st.error(f"An error occurred: {str(e)}")
-    #         response = "Sorry, I'm having trouble processing your request right now. Please try again later."
-    
     with st.spinner("Thinking..."):
-            try:
-                response = conversation.predict(human_input=st.session_state.user_input)
-                if "Do you confirm the above data?" in response:
-                    st.session_state.conversation_state = "awaiting_confirmation"
-                elif "Proceeding with detailed guidance" in response:
-                    st.session_state.conversation_state = "providing_guidance"
-            except Exception as e:
-                st.error(f"An error occurred: {str(e)}")
-                response = "Sorry, I'm having trouble processing your request right now. Please try again later."
+        try:
+            response = conversation.predict(human_input=st.session_state.user_input)
+            if "Do you confirm the above data?" in response:
+                st.session_state.conversation_state = "awaiting_confirmation"
+            elif "Proceeding with detailed guidance" in response:
+                st.session_state.conversation_state = "providing_guidance"
+        except Exception as e:
+            st.error(f"An error occurred: {str(e)}")
+            response = "Sorry, I'm having trouble processing your request right now. Please try again later."
 
     # Add bot response to chat history
     st.session_state['messages'].append({"role": "assistant", "content": response})
