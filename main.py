@@ -9,13 +9,28 @@ from pinecone import Pinecone
 import pinecone
 from langchain_openai import ChatOpenAI
 import openai
-from langchain.chains import LLMChain
+from groq import Groq
+from langchain.chains import LLMChain, RetrievalQA
+import time
 import re
 import warnings
 from langchain_pinecone import PineconeVectorStore
 from langchain.memory import ConversationBufferMemory
 from langchain.schema import HumanMessage
 from langchain.prompts import ChatPromptTemplate
+from langchain.chains import ConversationChain
+from langchain_core.output_parsers import StrOutputParser
+from langchain_core.runnables import RunnablePassthrough
+from langchain_core.runnables.base import Runnable
+from langchain_core.prompts import (
+    ChatPromptTemplate,
+    HumanMessagePromptTemplate,
+    MessagesPlaceholder,
+)
+from langchain_core.messages import SystemMessage
+from langchain.chains.conversation.memory import ConversationBufferWindowMemory
+from langchain_groq import ChatGroq
+import uuid
 from datetime import datetime, timedelta
 
 # Ignore all warnings
