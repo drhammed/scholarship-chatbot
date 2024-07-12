@@ -178,81 +178,55 @@ If the user responds with "Yes," proceed with providing detailed guidance. If th
     if 'user_input' not in st.session_state:
         st.session_state.user_input = ''
 
-    st.markdown(
-        """
-        <style>
-        .chat-input {
-            position: fixed;
-            bottom: 0;
-            width: 100%;
-            background-color: white;
-            padding: 10px 0;
-        }
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
+    user_question = st.chat_input("You: ")
 
-    user_question = st.text_input("Ask a question:", key="user_input", placeholder="Type your message here...")
+    if user_question:
+        st.session_state.user_input = user_question
+        
+        if st.session_state.conversation_state == "start":
+            prompt = ChatPromptTemplate.from_messages([
+                SystemMessage(content=system_prompt),
+                MessagesPlaceholder(variable_name="chat_history"),
+                HumanMessagePromptTemplate.from_template("{human_input}"),
+            ])
 
-    def submit():
-        if st.session_state.user_input:
-            if st.session_state.conversation_state == "start":
-                prompt = ChatPromptTemplate.from_messages([
-                    SystemMessage(content=system_prompt),
-                    MessagesPlaceholder(variable_name="chat_history"),
-                    HumanMessagePromptTemplate.from_template("{human_input}"),
-                ])
+        elif st.session_state.conversation_state == "awaiting_confirmation":
+            prompt = ChatPromptTemplate.from_messages([
+                SystemMessage(content=system_prompt),
+                MessagesPlaceholder(variable_name="chat_history"),
+                HumanMessagePromptTemplate.from_template("{human_input}"),
+                HumanMessagePromptTemplate.from_template("The user has confirmed the scholarships. Proceed with application guidance."),
+            ])
+        
+        conversation = LLMChain(
+            llm=llm_mod,
+            prompt=prompt,
+            verbose=False,
+            memory=memory,
+        )
 
-            elif st.session_state.conversation_state == "awaiting_confirmation":
-                prompt = ChatPromptTemplate.from_messages([
-                    SystemMessage(content=system_prompt),
-                    MessagesPlaceholder(variable_name="chat_history"),
-                    HumanMessagePromptTemplate.from_template("{human_input}"),
-                    HumanMessagePromptTemplate.from_template("The user has confirmed the scholarships. Proceed with application guidance."),
-                ])
-            
-            conversation = LLMChain(
-                llm=llm_mod,
-                prompt=prompt,
-                verbose=False,
-                memory=memory,
-            )
+        with st.spinner("Thinking..."):
+            try:
+                response = conversation.predict(human_input=st.session_state.user_input)
+                if "Do you confirm the above data?" in response:
+                    st.session_state.conversation_state = "awaiting_confirmation"
+                elif "Proceeding with detailed guidance" in response:
+                    st.session_state.conversation_state = "providing_guidance"
+            except Exception as e:
+                st.error(f"An error occurred: {str(e)}")
+                response = "Sorry, I'm having trouble processing your request right now. Please try again later."
 
-            with st.spinner("Thinking..."):
-                try:
-                    response = conversation.predict(human_input=st.session_state.user_input)
-                    if "Do you confirm the above data?" in response:
-                        st.session_state.conversation_state = "awaiting_confirmation"
-                    elif "Proceeding with detailed guidance" in response:
-                        st.session_state.conversation_state = "providing_guidance"
-                except Exception as e:
-                    st.error(f"An error occurred: {str(e)}")
-                    response = "Sorry, I'm having trouble processing your request right now. Please try again later."
+        # Set session name based on the first user input
+        if st.session_state.current_session_name is None:
+            st.session_state.current_session_name = generate_session_name(st.session_state.user_input)
 
-            # Set session name based on the first user input
-            if st.session_state.current_session_name is None:
-                st.session_state.current_session_name = generate_session_name(st.session_state.user_input)
+        st.session_state.chat_history.append(("User", st.session_state.user_input))
+        st.session_state.chat_history.append(("Chatbot", response))
+        
+        clear_input()  # Clear the input field
 
-            st.session_state.chat_history.append(("User", st.session_state.user_input))
-            st.session_state.chat_history.append(("Chatbot", response))
-            
-            clear_input()  # Clear the input field
-            # Trigger a state change
-            st.session_state.update_state = not st.session_state.get("update_state", False)
-
-            # Save the current session
-            save_current_session()
-
-    st.markdown(
-        """
-        <div class="chat-input">
-            <input type="text" placeholder="Type your message here..." onkeypress="if(event.key === 'Enter'){document.getElementById('send-btn').click();}">
-            <button id="send-btn" onclick="streamlit.submit()">Send</button>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
+        # Save the current session
+        save_current_session()
 
 if __name__ == "__main__":
     main()
