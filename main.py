@@ -33,17 +33,16 @@ from langchain_groq import ChatGroq
 import uuid
 from datetime import datetime, timedelta
 
-def make_clickable_links(text):
-    url_pattern = re.compile(r'(https?://[^\s\)\]]+)')
-    return url_pattern.sub(r'<a href="\1" target="_blank">\1</a>', text)
-
+# Function to get today's date in a readable format
 def get_readable_date():
     return datetime.now().strftime("%Y-%m-%d")
 
+# Function to generate a unique session name based on the first user query
 def generate_session_name(user_input):
     session_name = user_input[:30]
     return session_name
 
+# Function to save the current session
 def save_current_session():
     if st.session_state["current_session_name"] and len(st.session_state["chat_history"]) > 1:
         st.session_state["sessions"][st.session_state["current_session_name"]] = {
@@ -51,6 +50,7 @@ def save_current_session():
             "messages": st.session_state["chat_history"].copy()
         }
 
+# Function to display chat sessions in the sidebar
 def display_chat_sessions():
     st.sidebar.header("Chat Sessions")
     today = get_readable_date()
@@ -167,10 +167,10 @@ If the user responds with "Yes," proceed with providing detailed guidance. If th
 
     for sender, message in st.session_state.chat_history:
         if sender == "User":
-            st.markdown(f"<div style='color: blue;'><strong>{sender}:</strong> {message}</div>", unsafe_allow_html=True)
+            st.markdown(f"<div><strong>{sender}:</strong> {message}</div>", unsafe_allow_html=True)
         else:
             message_with_links = make_clickable_links(message)
-            st.markdown(f"<div style='color: green;'><strong>{sender}:</strong> {message_with_links}</div>", unsafe_allow_html=True)
+            st.markdown(f"<div><strong>{sender}:</strong> {message_with_links}</div>", unsafe_allow_html=True)
 
     def clear_input():
         st.session_state.user_input = ''
@@ -182,6 +182,10 @@ If the user responds with "Yes," proceed with providing detailed guidance. If th
 
     if user_question:
         st.session_state.user_input = user_question
+
+        # Set session name based on the first user input
+        if st.session_state.current_session_name is None:
+            st.session_state.current_session_name = generate_session_name(st.session_state.user_input)
         
         if st.session_state.conversation_state == "start":
             prompt = ChatPromptTemplate.from_messages([
@@ -215,10 +219,6 @@ If the user responds with "Yes," proceed with providing detailed guidance. If th
             except Exception as e:
                 st.error(f"An error occurred: {str(e)}")
                 response = "Sorry, I'm having trouble processing your request right now. Please try again later."
-
-        # Set session name based on the first user input
-        if st.session_state.current_session_name is None:
-            st.session_state.current_session_name = generate_session_name(st.session_state.user_input)
 
         st.session_state.chat_history.append(("User", st.session_state.user_input))
         st.session_state.chat_history.append(("Chatbot", response))
