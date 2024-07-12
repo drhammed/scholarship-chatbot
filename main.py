@@ -9,9 +9,7 @@ from pinecone import Pinecone
 import pinecone
 from langchain_openai import ChatOpenAI
 import openai
-from groq import Groq
-from langchain.chains import LLMChain, RetrievalQA
-import time
+from langchain.chains import LLMChain
 import re
 import warnings
 from langchain_pinecone import PineconeVectorStore
@@ -29,64 +27,32 @@ from langchain_core.prompts import (
 )
 from langchain_core.messages import SystemMessage
 from langchain.chains.conversation.memory import ConversationBufferWindowMemory
-from langchain_groq import ChatGroq
-import uuid
 from datetime import datetime, timedelta
 
-def make_clickable_links(text):
-    url_pattern = re.compile(r'(https?://[^\s\)\]]+)')
-    return url_pattern.sub(r'<a href="\1" target="_blank">\1</a>', text)
+# Ignore all warnings
+warnings.filterwarnings("ignore")
 
-# Function to get today's date in a readable format
-def get_readable_date():
-    return datetime.now().strftime("%Y-%m-%d")
+# Set up Streamlit app
+st.set_page_config(page_title="Scholarship Chatbot by drhammed", layout="wide")
+st.title("Scholarship Chatbot by drhammed")
+st.write("Hello! I'm your friendly chatbot. I'm here to help answer your questions regarding scholarships and funding for students, and provide information. I'm also super fast! Let's start!")
 
-# Function to generate a unique session name based on the first user query
-def generate_session_name(user_input):
-    session_name = user_input[:30]
-    return session_name
+# Load environment variables from .env file
+load_dotenv()
 
-# Function to save the current session
-def save_current_session():
-    if st.session_state["current_session_name"] and len(st.session_state["chat_history"]) > 1:
-        st.session_state["sessions"][st.session_state["current_session_name"]] = {
-            "date": get_readable_date(),
-            "messages": st.session_state["chat_history"].copy()
-        }
+# Initialize Pinecone
+PINECONE_API_KEY = os.getenv('My_Pinecone_API_key')
+# Initialize OpenAI
+OPENAI_API_KEY = os.getenv('My_OpenAI_API_key')
 
-# Function to display chat sessions in the sidebar
-def display_chat_sessions():
-    st.sidebar.header("Chat Sessions")
-    today = get_readable_date()
-    yesterday = (datetime.now() - timedelta(1)).strftime("%Y-%m-%d")
-    sessions = sorted(st.session_state["sessions"].items(), key=lambda x: x[1]["date"], reverse=True)
-    
-    current_day = ""
-    for session_name, session_info in sessions:
-        session_day = session_info["date"]
-        if session_day != current_day:
-            if session_day == today:
-                st.sidebar.subheader("Today")
-            elif session_day == yesterday:
-                st.sidebar.subheader("Yesterday")
-            else:
-                st.sidebar.subheader(session_day)
-            current_day = session_day
-        if st.sidebar.button(session_name):
-            st.session_state["chat_history"] = session_info["messages"]
+# Initialize OpenAI model
+llm = ChatOpenAI(model="gpt-4o", temperature=0, max_tokens=None, timeout=None, max_retries=2, api_key=OPENAI_API_KEY)
 
-def main():
-    st.set_page_config(page_title="Scholarship Chatbot by drhammed", layout="wide")
-    st.title("Scholarship Chatbot by drhammed")
-    st.write("Hello! I'm your friendly chatbot. I'm here to help answer your questions regarding scholarships and funding for students, and provide information. I'm also super fast! Let's start!")
+# Initialize the conversation memory
+memory = ConversationBufferMemory()
 
-    load_dotenv()
-
-    OPENAI_API_KEY = st.secrets["api_keys"]["OPENAI_API_KEY"]
-    llm_mod = ChatOpenAI(model="gpt-4o", temperature=0, max_tokens=None, timeout=None, max_retries=2, api_key=OPENAI_API_KEY)
-
-    system_prompt = """
-    Your primary tasks involve providing scholarship and funding information for users. Follow these steps for each task:
+system_prompt = """
+Your primary tasks involve providing scholarship and funding information for users. Follow these steps for each task:
 
 1. **Scholarship Identification**:
    - Ask the user for their field of study, level of education, and other relevant details.
@@ -149,88 +115,105 @@ Assistant: "Proceeding with detailed guidance."
 
 If the user responds with "Yes," proceed with providing detailed guidance. If the user responds with "No" or requests changes at any step, update the data and seek confirmation again.
 """
-    conversational_memory_length = 10
 
-    memory = ConversationBufferWindowMemory(k=conversational_memory_length,
-                                            memory_key="chat_history",
-                                            return_messages=True)
+# Initialize chat history
+if "messages" not in st.session_state:
+    st.session_state["messages"] = []
 
-    if 'chat_history' not in st.session_state:
-        st.session_state.chat_history = []
+if "sessions" not in st.session_state:
+    st.session_state["sessions"] = {}
 
-    if 'sessions' not in st.session_state:
-        st.session_state.sessions = {}
+if "current_session_name" not in st.session_state:
+    st.session_state["current_session_name"] = None
 
-    if 'current_session_name' not in st.session_state:
-        st.session_state.current_session_name = None
+# Function to get today's date in a readable format
+def get_readable_date():
+    return datetime.now().strftime("%Y-%m-%d")
 
-    if 'conversation_state' not in st.session_state:
-        st.session_state.conversation_state = "start"
+# Function to generate a unique session name based on the first user query
+def generate_session_name(user_input):
+    session_name = user_input[:30]
+    return session_name
 
-    display_chat_sessions()
+# Function to save the current session
+def save_current_session():
+    if st.session_state["current_session_name"] and len(st.session_state["messages"]) > 1:
+        st.session_state["sessions"][st.session_state["current_session_name"]] = {
+            "date": get_readable_date(),
+            "messages": st.session_state["messages"].copy()
+        }
 
-    for sender, message in st.session_state.chat_history:
-        if sender == "User":
-            st.markdown(f"<div><strong>{sender}:</strong> {message}</div>", unsafe_allow_html=True)
-        else:
-            message_with_links = make_clickable_links(message)
-            st.markdown(f"<div><strong>{sender}:</strong> {message_with_links}</div>", unsafe_allow_html=True)
+# Function to display chat sessions in the sidebar
+def display_chat_sessions():
+    st.sidebar.header("Chat History")
+    today = get_readable_date()
+    yesterday = (datetime.now() - timedelta(1)).strftime("%Y-%m-%d")
+    sessions = sorted(st.session_state["sessions"].items(), key=lambda x: x[1]["date"], reverse=True)
+    
+    current_day = ""
+    for session_name, session_info in sessions:
+        session_day = session_info["date"]
+        if session_day != current_day:
+            if session_day == today:
+                st.sidebar.subheader("Today")
+            elif session_day == yesterday:
+                st.sidebar.subheader("Yesterday")
+            else:
+                st.sidebar.subheader(session_day)
+            current_day = session_day
+        if st.sidebar.button(session_name):
+            st.session_state["messages"] = session_info["messages"]
 
-    def clear_input():
-        st.session_state.user_input = ''
+# Display saved chat sessions in the sidebar
+display_chat_sessions()
 
-    if 'user_input' not in st.session_state:
-        st.session_state.user_input = ''
+# Display chat messages from history
+for message in st.session_state["messages"]:
+    with st.chat_message(message["role"]):
+        st.markdown(message["content"])
 
-    user_question = st.chat_input("You: ")
+# Get user input
+user_input = st.chat_input("You: ")
 
-    if user_question:
-        st.session_state.user_input = user_question
+if user_input:
+    # Set session name based on the first user input
+    if st.session_state["current_session_name"] is None:
+        st.session_state["current_session_name"] = generate_session_name(user_input)
+    
+    # Add user message to chat history
+    st.session_state["messages"].append({"role": "user", "content": user_input})
+    
+    # Display user message
+    with st.chat_message("user"):
+        st.markdown(user_input)
+    
+    # Prepare the prompt
+    prompt = ChatPromptTemplate.from_messages([
+        SystemMessage(content=system_prompt),
+        MessagesPlaceholder(variable_name="chat_history"),
+        HumanMessagePromptTemplate.from_template("{human_input}"),
+    ])
 
-        # Set session name based on the first user input
-        if st.session_state.current_session_name is None:
-            st.session_state.current_session_name = generate_session_name(st.session_state.user_input)
-        
-        if st.session_state.conversation_state == "start":
-            prompt = ChatPromptTemplate.from_messages([
-                SystemMessage(content=system_prompt),
-                MessagesPlaceholder(variable_name="chat_history"),
-                HumanMessagePromptTemplate.from_template("{human_input}"),
-            ])
+    conversation = LLMChain(
+        llm=llm,
+        prompt=prompt,
+        verbose=False,
+        memory=memory,
+    )
 
-        elif st.session_state.conversation_state == "awaiting_confirmation":
-            prompt = ChatPromptTemplate.from_messages([
-                SystemMessage(content=system_prompt),
-                MessagesPlaceholder(variable_name="chat_history"),
-                HumanMessagePromptTemplate.from_template("{human_input}"),
-                HumanMessagePromptTemplate.from_template("The user has confirmed the scholarships. Proceed with application guidance."),
-            ])
-        
-        conversation = LLMChain(
-            llm=llm_mod,
-            prompt=prompt,
-            verbose=False,
-            memory=memory,
-        )
+    with st.spinner("Thinking..."):
+        try:
+            response = conversation.predict(human_input=user_input)
+        except Exception as e:
+            st.error(f"An error occurred: {str(e)}")
+            response = "Sorry, I'm having trouble processing your request right now. Please try again later."
 
-        with st.spinner("Thinking..."):
-            try:
-                response = conversation.predict(human_input=st.session_state.user_input)
-                if "Do you confirm the above data?" in response:
-                    st.session_state.conversation_state = "awaiting_confirmation"
-                elif "Proceeding with detailed guidance" in response:
-                    st.session_state.conversation_state = "providing_guidance"
-            except Exception as e:
-                st.error(f"An error occurred: {str(e)}")
-                response = "Sorry, I'm having trouble processing your request right now. Please try again later."
-
-        st.session_state.chat_history.append(("User", st.session_state.user_input))
-        st.session_state.chat_history.append(("Chatbot", response))
-        
-        clear_input()  # Clear the input field
-
-        # Save the current session
-        save_current_session()
-
-if __name__ == "__main__":
-    main()
+    # Add bot response to chat history
+    st.session_state["messages"].append({"role": "assistant", "content": response})
+    
+    # Display bot response
+    with st.chat_message("assistant"):
+        st.markdown(response)
+    
+    # Save the current session automatically
+    save_current_session()
