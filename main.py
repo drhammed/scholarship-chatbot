@@ -79,9 +79,9 @@ def main():
 
     #GROQ_API_KEY = st.secrets["api_keys"]["GROQ_API_KEY"]
     #model = 'llama3-70b-8192'
-
     #llm_mod = ChatGroq(groq_api_key=GROQ_API_KEY, model_name=model, temperature=0.02)
     
+    OPENAI_API_KEY = st.secrets["api_keys"]["OPENAI_API_KEY"]
     llm_mod = ChatOpenAI(model="gpt-4o", temperature=0, max_tokens=None, timeout=None, max_retries=2, api_key=OPENAI_API_KEY)
 
     system_prompt = """
