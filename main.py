@@ -206,7 +206,7 @@ if user_question:
     
     # Display user message
     with st.chat_message("user"):
-        st.markdown(user_input)
+        st.markdown(st.session_state.user_input)
         
     if st.session_state.conversation_state == "start":
             prompt = ChatPromptTemplate.from_messages([
