@@ -181,45 +181,53 @@ for message in st.session_state['messages']:
     with st.chat_message(message['role']):
         st.markdown(message['content'])
 
-# Get user input
-user_input = st.chat_input("You: ")
+if 'user_input' not in st.session_state:
+        st.session_state.user_input = ''
 
-if user_input:
+user_question = st.chat_input("You: ")
+
+if user_question:
+    st.session_state.user_input = user_question
+
     # Set session name based on the first user input
-    if st.session_state['current_session_name'] is None:
-        st.session_state['current_session_name'] = generate_session_name(user_input)
-    
-    # Add user message to chat history
-    st.session_state['messages'].append({"role": "user", "content": user_input})
-    
-    # Display user message
-    with st.chat_message("user"):
-        st.markdown(user_input)
-    
-    # Prepare the prompt
-    prompt = ChatPromptTemplate.from_messages([
-        SystemMessage(content=system_prompt),
-        MessagesPlaceholder(variable_name="chat_history"),
-        HumanMessagePromptTemplate.from_template("{human_input}"),
-    ])
+    if st.session_state.current_session_name is None:
+            st.session_state.current_session_name = generate_session_name(st.session_state.user_input)
+        
+    if st.session_state.conversation_state == "start":
+            prompt = ChatPromptTemplate.from_messages([
+                SystemMessage(content=system_prompt),
+                MessagesPlaceholder(variable_name="chat_history"),
+                HumanMessagePromptTemplate.from_template("{human_input}"),
+            ])
 
+    elif st.session_state.conversation_state == "awaiting_confirmation":
+            prompt = ChatPromptTemplate.from_messages([
+                SystemMessage(content=system_prompt),
+                MessagesPlaceholder(variable_name="chat_history"),
+                HumanMessagePromptTemplate.from_template("{human_input}"),
+                HumanMessagePromptTemplate.from_template("The user has confirmed the scholarships. Proceed with application guidance."),
+            ])
+        
     conversation = LLMChain(
-        llm=llm_mod,
-        prompt=prompt,
-        verbose=False,
-        memory=memory,
+            llm=llm_mod,
+            prompt=prompt,
+            verbose=False,
+            memory=memory,
     )
 
     with st.spinner("Thinking..."):
         try:
             response = conversation.predict(human_input=st.session_state.user_input)
             if "Do you confirm the above data?" in response:
-                st.session_state.conversation_state = "awaiting_confirmation"
+                    st.session_state.conversation_state = "awaiting_confirmation"
             elif "Proceeding with detailed guidance" in response:
-                st.session_state.conversation_state = "providing_guidance"
+                    st.session_state.conversation_state = "providing_guidance"
         except Exception as e:
             st.error(f"An error occurred: {str(e)}")
             response = "Sorry, I'm having trouble processing your request right now. Please try again later."
+
+    #st.session_state.chat_history.append(("User", st.session_state.user_input))
+    #st.session_state.chat_history.append(("Chatbot", response))
 
     # Add bot response to chat history
     st.session_state['messages'].append({"role": "assistant", "content": response})
