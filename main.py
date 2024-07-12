@@ -77,10 +77,12 @@ def main():
 
     load_dotenv()
 
-    GROQ_API_KEY = st.secrets["api_keys"]["GROQ_API_KEY"]
-    model = 'llama3-70b-8192'
+    #GROQ_API_KEY = st.secrets["api_keys"]["GROQ_API_KEY"]
+    #model = 'llama3-70b-8192'
 
-    groq_chat = ChatGroq(groq_api_key=GROQ_API_KEY, model_name=model, temperature=0.02)
+    #llm_mod = ChatGroq(groq_api_key=GROQ_API_KEY, model_name=model, temperature=0.02)
+    
+    llm_mod = ChatOpenAI(model="gpt-4o", temperature=0, max_tokens=None, timeout=None, max_retries=2, api_key=OPENAI_API_KEY)
 
     system_prompt = """
     Your primary tasks involve providing scholarship and funding information for users. Follow these steps for each task:
@@ -200,7 +202,7 @@ If the user responds with "Yes," proceed with providing detailed guidance. If th
                 ])
             
             conversation = LLMChain(
-                llm=groq_chat,
+                llm=llm_mod,
                 prompt=prompt,
                 verbose=False,
                 memory=memory,
