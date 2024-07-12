@@ -48,6 +48,12 @@ OPENAI_API_KEY = st.secrets["api_keys"]["OPENAI_API_KEY"]
 # Initialize OpenAI model
 llm_mod = ChatOpenAI(model="gpt-4o", temperature=0, max_tokens=None, timeout=None, max_retries=2, api_key=OPENAI_API_KEY)
 
+## If using Groq- Get Groq API key from environment variable
+#GROQ_API_KEY = st.secrets["api_keys"]["GROQ_API_KEY"]
+#model = 'llama3-70b-8192'
+## Initialize Groq Langchain chat object and conversation
+#llm_mod = ChatGroq(groq_api_key=GROQ_API_KEY, model_name=model, temperature=0.02)
+
 system_prompt = """
 Your primary tasks involve providing scholarship and funding information for users. Follow these steps for each task:
 
