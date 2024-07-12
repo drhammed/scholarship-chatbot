@@ -200,6 +200,13 @@ if user_question:
     # Set session name based on the first user input
     if st.session_state.current_session_name is None:
             st.session_state.current_session_name = generate_session_name(st.session_state.user_input)
+    
+    # Add user message to chat history
+    st.session_state["messages"].append({"role": "user", "content": user_input})
+    
+    # Display user message
+    with st.chat_message("user"):
+        st.markdown(user_input)
         
     if st.session_state.conversation_state == "start":
             prompt = ChatPromptTemplate.from_messages([
