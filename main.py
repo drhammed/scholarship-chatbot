@@ -44,8 +44,13 @@ st.write("Hello! I'm your friendly chatbot. I'm here to help answer your questio
 # Load environment variables from .env file
 load_dotenv()
 
+
 #OpenAI model
 OPENAI_API_KEY = st.secrets["api_keys"]["OPENAI_API_KEY"]
+
+# Initialize OpenAI model
+llm_mod = ChatOpenAI(model="gpt-4o", temperature=0, max_tokens=None, timeout=None, max_retries=2, api_key=OPENAI_API_KEY)
+
 
 # Initialize OpenAI model
 llm_mod = ChatOpenAI(model="gpt-4o", temperature=0, max_tokens=None, timeout=None, max_retries=2, api_key=OPENAI_API_KEY)
