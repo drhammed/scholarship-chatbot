@@ -112,6 +112,12 @@ Assistant: "Proceeding with detailed guidance."
 If the user responds with "Yes," proceed with providing detailed guidance. If the user responds with "No" or requests changes at any step, update the data and seek confirmation again.
 """
 
+# Initialize the conversation memory
+memory = ConversationBufferMemory()
+
+if 'chat_history' not in st.session_state:
+        st.session_state.chat_history = []
+        
 # Initialize chat history
 if "messages" not in st.session_state:
     st.session_state["messages"] = []
