@@ -72,15 +72,12 @@ def display_chat_sessions():
             st.session_state["chat_history"] = session_info["messages"]
 
 def main():
+    st.set_page_config(page_title="Scholarship Chatbot by drhammed", layout="wide")
     st.title("Scholarship Chatbot by drhammed")
     st.write("Hello! I'm your friendly chatbot. I'm here to help answer your questions regarding scholarships and funding for students, and provide information. I'm also super fast! Let's start!")
 
     load_dotenv()
 
-    #GROQ_API_KEY = st.secrets["api_keys"]["GROQ_API_KEY"]
-    #model = 'llama3-70b-8192'
-    #llm_mod = ChatGroq(groq_api_key=GROQ_API_KEY, model_name=model, temperature=0.02)
-    
     OPENAI_API_KEY = st.secrets["api_keys"]["OPENAI_API_KEY"]
     llm_mod = ChatOpenAI(model="gpt-4o", temperature=0, max_tokens=None, timeout=None, max_retries=2, api_key=OPENAI_API_KEY)
 
@@ -168,21 +165,35 @@ If the user responds with "Yes," proceed with providing detailed guidance. If th
 
     display_chat_sessions()
 
-    st.write("### Chat History")
     for sender, message in st.session_state.chat_history:
         if sender == "User":
             st.markdown(f"<div style='color: blue;'><strong>{sender}:</strong> {message}</div>", unsafe_allow_html=True)
         else:
             message_with_links = make_clickable_links(message)
             st.markdown(f"<div style='color: green;'><strong>{sender}:</strong> {message_with_links}</div>", unsafe_allow_html=True)
-            
+
     def clear_input():
         st.session_state.user_input = ''
 
     if 'user_input' not in st.session_state:
         st.session_state.user_input = ''
-    
-    user_question = st.text_input("Ask a question:", key="user_input")
+
+    st.markdown(
+        """
+        <style>
+        .chat-input {
+            position: fixed;
+            bottom: 0;
+            width: 100%;
+            background-color: white;
+            padding: 10px 0;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    user_question = st.text_input("Ask a question:", key="user_input", placeholder="Type your message here...")
 
     def submit():
         if st.session_state.user_input:
@@ -233,8 +244,15 @@ If the user responds with "Yes," proceed with providing detailed guidance. If th
             # Save the current session
             save_current_session()
 
-    if st.button("Send", on_click=submit):
-        pass
+    st.markdown(
+        """
+        <div class="chat-input">
+            <input type="text" placeholder="Type your message here..." onkeypress="if(event.key === 'Enter'){document.getElementById('send-btn').click();}">
+            <button id="send-btn" onclick="streamlit.submit()">Send</button>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
 if __name__ == "__main__":
     main()
