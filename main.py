@@ -16,17 +16,6 @@ from langchain_pinecone import PineconeVectorStore
 from langchain.memory import ConversationBufferMemory
 from langchain.schema import HumanMessage
 from langchain.prompts import ChatPromptTemplate
-from langchain.chains import ConversationChain
-from langchain_core.output_parsers import StrOutputParser
-from langchain_core.runnables import RunnablePassthrough
-from langchain_core.runnables.base import Runnable
-from langchain_core.prompts import (
-    ChatPromptTemplate,
-    HumanMessagePromptTemplate,
-    MessagesPlaceholder,
-)
-from langchain_core.messages import SystemMessage
-from langchain.chains.conversation.memory import ConversationBufferWindowMemory
 from datetime import datetime, timedelta
 
 # Ignore all warnings
@@ -40,12 +29,13 @@ st.write("Hello! I'm your friendly chatbot. I'm here to help answer your questio
 # Load environment variables from .env file
 load_dotenv()
 
-OPENAI_API_KEY = st.secrets["api_keys"]["OPENAI_API_KEY"]
-llm_mod = ChatOpenAI(model="gpt-4o", temperature=0, max_tokens=None, timeout=None, max_retries=2, api_key=OPENAI_API_KEY)
-    
+# Initialize Pinecone
+PINECONE_API_KEY = os.getenv('My_Pinecone_API_key')
+# Initialize OpenAI
+OPENAI_API_KEY = os.getenv('My_OpenAI_API_key')
 
-# Initialize the conversation memory
-memory = ConversationBufferMemory()
+# Initialize OpenAI model
+llm = ChatOpenAI(model="gpt-4o", temperature=0, max_tokens=None, timeout=None, max_retries=2, api_key=OPENAI_API_KEY)
 
 system_prompt = """
 Your primary tasks involve providing scholarship and funding information for users. Follow these steps for each task:
@@ -115,18 +105,18 @@ If the user responds with "Yes," proceed with providing detailed guidance. If th
 # Initialize the conversation memory
 memory = ConversationBufferMemory()
 
-if 'chat_history' not in st.session_state:
-        st.session_state.chat_history = []
-        
 # Initialize chat history
-if "messages" not in st.session_state:
-    st.session_state["messages"] = []
+if 'messages' not in st.session_state:
+    st.session_state['messages'] = []
 
-if "sessions" not in st.session_state:
-    st.session_state["sessions"] = {}
+if 'chat_history' not in st.session_state:
+    st.session_state['chat_history'] = []
 
-if "current_session_name" not in st.session_state:
-    st.session_state["current_session_name"] = None
+if 'sessions' not in st.session_state:
+    st.session_state['sessions'] = {}
+
+if 'current_session_name' not in st.session_state:
+    st.session_state['current_session_name'] = None
 
 # Function to get today's date in a readable format
 def get_readable_date():
@@ -139,10 +129,10 @@ def generate_session_name(user_input):
 
 # Function to save the current session
 def save_current_session():
-    if st.session_state["current_session_name"] and len(st.session_state["messages"]) > 1:
-        st.session_state["sessions"][st.session_state["current_session_name"]] = {
-            "date": get_readable_date(),
-            "messages": st.session_state["messages"].copy()
+    if st.session_state['current_session_name'] and len(st.session_state['messages']) > 1:
+        st.session_state['sessions'][st.session_state['current_session_name']] = {
+            'date': get_readable_date(),
+            'messages': st.session_state['messages'].copy()
         }
 
 # Function to display chat sessions in the sidebar
@@ -150,11 +140,11 @@ def display_chat_sessions():
     st.sidebar.header("Chat History")
     today = get_readable_date()
     yesterday = (datetime.now() - timedelta(1)).strftime("%Y-%m-%d")
-    sessions = sorted(st.session_state["sessions"].items(), key=lambda x: x[1]["date"], reverse=True)
+    sessions = sorted(st.session_state['sessions'].items(), key=lambda x: x[1]['date'], reverse=True)
     
     current_day = ""
     for session_name, session_info in sessions:
-        session_day = session_info["date"]
+        session_day = session_info['date']
         if session_day != current_day:
             if session_day == today:
                 st.sidebar.subheader("Today")
@@ -164,26 +154,26 @@ def display_chat_sessions():
                 st.sidebar.subheader(session_day)
             current_day = session_day
         if st.sidebar.button(session_name):
-            st.session_state["messages"] = session_info["messages"]
+            st.session_state['messages'] = session_info['messages']
 
 # Display saved chat sessions in the sidebar
 display_chat_sessions()
 
 # Display chat messages from history
-for message in st.session_state["messages"]:
-    with st.chat_message(message["role"]):
-        st.markdown(message["content"])
+for message in st.session_state['messages']:
+    with st.chat_message(message['role']):
+        st.markdown(message['content'])
 
 # Get user input
 user_input = st.chat_input("You: ")
 
 if user_input:
     # Set session name based on the first user input
-    if st.session_state["current_session_name"] is None:
-        st.session_state["current_session_name"] = generate_session_name(user_input)
+    if st.session_state['current_session_name'] is None:
+        st.session_state['current_session_name'] = generate_session_name(user_input)
     
     # Add user message to chat history
-    st.session_state["messages"].append({"role": "user", "content": user_input})
+    st.session_state['messages'].append({"role": "user", "content": user_input})
     
     # Display user message
     with st.chat_message("user"):
@@ -197,7 +187,7 @@ if user_input:
     ])
 
     conversation = LLMChain(
-        llm=llm_mod,
+        llm=llm,
         prompt=prompt,
         verbose=False,
         memory=memory,
@@ -205,13 +195,13 @@ if user_input:
 
     with st.spinner("Thinking..."):
         try:
-            response = conversation.predict(human_input=user_input)
+            response = conversation.predict(human_input=user_input, chat_history=st.session_state['messages'])
         except Exception as e:
             st.error(f"An error occurred: {str(e)}")
             response = "Sorry, I'm having trouble processing your request right now. Please try again later."
 
     # Add bot response to chat history
-    st.session_state["messages"].append({"role": "assistant", "content": response})
+    st.session_state['messages'].append({"role": "assistant", "content": response})
     
     # Display bot response
     with st.chat_message("assistant"):
