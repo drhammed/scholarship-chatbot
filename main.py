@@ -186,6 +186,9 @@ for message in st.session_state['messages']:
     with st.chat_message(message['role']):
         st.markdown(message['content'])
 
+def clear_input():
+        st.session_state.user_input = ''
+
 if 'user_input' not in st.session_state:
         st.session_state.user_input = ''
 
@@ -240,6 +243,8 @@ if user_question:
     # Display bot response
     with st.chat_message("assistant"):
         st.markdown(response)
+    
+    clear_input() # Clear the input field
     
     # Save the current session automatically
     save_current_session()
