@@ -202,7 +202,7 @@ if user_question:
             st.session_state.current_session_name = generate_session_name(st.session_state.user_input)
     
     # Add user message to chat history
-    st.session_state["messages"].append({"role": "user", "content": user_input})
+    st.session_state["messages"].append({"role": "user", "content": st.session_state.user_input})
     
     # Display user message
     with st.chat_message("user"):
