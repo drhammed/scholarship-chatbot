@@ -31,27 +31,55 @@ from langchain_core.messages import SystemMessage
 from langchain.chains.conversation.memory import ConversationBufferWindowMemory
 from langchain_groq import ChatGroq
 import uuid
+from datetime import datetime, timedelta
 
 def make_clickable_links(text):
     url_pattern = re.compile(r'(https?://[^\s\)\]]+)')
     return url_pattern.sub(r'<a href="\1" target="_blank">\1</a>', text)
 
+def get_readable_date():
+    return datetime.now().strftime("%Y-%m-%d")
+
+def generate_session_name(user_input):
+    session_name = user_input[:30]
+    return session_name
+
+def save_current_session():
+    if st.session_state["current_session_name"] and len(st.session_state["chat_history"]) > 1:
+        st.session_state["sessions"][st.session_state["current_session_name"]] = {
+            "date": get_readable_date(),
+            "messages": st.session_state["chat_history"].copy()
+        }
+
+def display_chat_sessions():
+    st.sidebar.header("Chat Sessions")
+    today = get_readable_date()
+    yesterday = (datetime.now() - timedelta(1)).strftime("%Y-%m-%d")
+    sessions = sorted(st.session_state["sessions"].items(), key=lambda x: x[1]["date"], reverse=True)
+    
+    current_day = ""
+    for session_name, session_info in sessions:
+        session_day = session_info["date"]
+        if session_day != current_day:
+            if session_day == today:
+                st.sidebar.subheader("Today")
+            elif session_day == yesterday:
+                st.sidebar.subheader("Yesterday")
+            else:
+                st.sidebar.subheader(session_day)
+            current_day = session_day
+        if st.sidebar.button(session_name):
+            st.session_state["chat_history"] = session_info["messages"]
+
 def main():
     st.title("Scholarship Chatbot by drhammed")
     st.write("Hello! I'm your friendly chatbot. I'm here to help answer your questions regarding scholarships and funding for students, and provide information. I'm also super fast! Let's start!")
 
-    # Get OpenAI API key from environment variable
-    #OPENAI_API_KEY = st.secrets["api_keys"]["OPENAI_API_KEY"]
-    #openai.api_key = OPENAI_API_KEY
+    load_dotenv()
 
-    ## # Get Groq API key from environment variable
     GROQ_API_KEY = st.secrets["api_keys"]["GROQ_API_KEY"]
     model = 'llama3-70b-8192'
 
-    # Initialize OpenAI Langchain chat object and conversation
-    #openai_chat = ChatOpenAI(api_key=OPENAI_API_KEY, model_name="gpt-4-turbo", temperature=0.02)
-
-    ## # Initialize Groq Langchain chat object and conversation
     groq_chat = ChatGroq(groq_api_key=GROQ_API_KEY, model_name=model, temperature=0.02)
 
     system_prompt = """
@@ -127,8 +155,16 @@ If the user responds with "Yes," proceed with providing detailed guidance. If th
     if 'chat_history' not in st.session_state:
         st.session_state.chat_history = []
 
+    if 'sessions' not in st.session_state:
+        st.session_state.sessions = {}
+
+    if 'current_session_name' not in st.session_state:
+        st.session_state.current_session_name = None
+
     if 'conversation_state' not in st.session_state:
         st.session_state.conversation_state = "start"
+
+    display_chat_sessions()
 
     st.write("### Chat History")
     for sender, message in st.session_state.chat_history:
@@ -181,12 +217,19 @@ If the user responds with "Yes," proceed with providing detailed guidance. If th
                     st.error(f"An error occurred: {str(e)}")
                     response = "Sorry, I'm having trouble processing your request right now. Please try again later."
 
+            # Set session name based on the first user input
+            if st.session_state.current_session_name is None:
+                st.session_state.current_session_name = generate_session_name(st.session_state.user_input)
+
             st.session_state.chat_history.append(("User", st.session_state.user_input))
             st.session_state.chat_history.append(("Chatbot", response))
             
             clear_input()  # Clear the input field
             # Trigger a state change
             st.session_state.update_state = not st.session_state.get("update_state", False)
+
+            # Save the current session
+            save_current_session()
 
     if st.button("Send", on_click=submit):
         pass
