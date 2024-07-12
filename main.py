@@ -33,6 +33,10 @@ from langchain_groq import ChatGroq
 import uuid
 from datetime import datetime, timedelta
 
+def make_clickable_links(text):
+    url_pattern = re.compile(r'(https?://[^\s\)\]]+)')
+    return url_pattern.sub(r'<a href="\1" target="_blank">\1</a>', text)
+
 # Function to get today's date in a readable format
 def get_readable_date():
     return datetime.now().strftime("%Y-%m-%d")
