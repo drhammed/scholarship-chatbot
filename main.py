@@ -39,31 +39,15 @@ warnings.filterwarnings("ignore")
 # Set up Streamlit app
 st.set_page_config(page_title="Scholarship Chatbot by drhammed", layout="wide")
 
-# Custom CSS to adjust the position
-st.markdown(
-    """
-    <style>
-    .stContainer {
-        position: fixed;
-        top: 0;
-        left: 0;
-        z-index: 1000;
-        background-color: white;
-        padding: 10px;
-    }
-    .stSelectbox {
-        margin-bottom: 0;
-    }
-    </style>
-    """,
-    unsafe_allow_html=True,
-)
-
 # Header section with model selection
 header = st.container()
 with header:
-    model_options = ["gpt-4o", "gpt-4", "llama3-70b-8192", "llama3-8b-8192"]
-    selected_model = st.selectbox("Select a model", model_options, key="model_select")
+    col1, col2 = st.columns([1, 4])
+    with col1:
+        model_options = ["gpt-4o", "gpt-4", "llama3-70b-8192", "llama3-8b-8192"]
+        selected_model = st.selectbox("Select a model", model_options)
+    with col2:
+        st.write(" ")
 
 # Title and introduction
 st.title("Scholarship Chatbot by drhammed")
