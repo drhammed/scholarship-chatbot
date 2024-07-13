@@ -133,8 +133,9 @@ If the user responds with "Yes," proceed with providing detailed guidance. If th
 """
 
 # Initialize the conversation memory
-conversational_memory_length = 100
-memory = ConversationBufferWindowMemory(k=conversational_memory_length, memory_key="chat_history", return_messages=True)
+#conversational_memory_length = 100
+#memory = ConversationBufferWindowMemory(k=conversational_memory_length, memory_key="chat_history", return_messages=True)
+memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
 
 # Initialize chat history
 if 'messages' not in st.session_state:
