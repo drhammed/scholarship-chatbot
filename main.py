@@ -49,9 +49,9 @@ with header:
     with col2:
         st.write(" ")
 
+# Title and introduction
 st.title("Scholarship Chatbot by drhammed")
 st.write("Hello! I'm your friendly chatbot. I'm here to help answer your questions regarding scholarships and funding for students, and provide information. I'm also super fast! Let's start!")
-
 
 # Load environment variables from .env file
 load_dotenv()
@@ -60,7 +60,6 @@ load_dotenv()
 OPENAI_API_KEY = st.secrets["api_keys"]["OPENAI_API_KEY"]
 #Groq API KEY
 GROQ_API_KEY = st.secrets["api_keys"]["GROQ_API_KEY"]
-
 
 # Initialize selected model
 def get_model(selected_model):
