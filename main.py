@@ -60,7 +60,7 @@ def get_model(selected_model):
         return ChatOpenAI(model="gpt-4", temperature=0, max_tokens=None, timeout=None, max_retries=2, api_key=OPENAI_API_KEY)
     elif selected_model == "llama3-70b-8192":
         return ChatGroq(groq_api_key=GROQ_API_KEY,model="llama3-70b-8192", temperature=0.02, max_tokens=None, timeout=None, max_retries=2)
-    elif selected_model == "llama3-70b-8192":
+    elif selected_model == "llama3-8b-8192":
         return ChatGroq(groq_api_key=GROQ_API_KEY,model="llama3-8b-8192", temperature=0.02, max_tokens=None, timeout=None, max_retries=2)
     else:
         raise ValueError("Invalid model selected")
