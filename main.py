@@ -45,9 +45,13 @@ st.write("Hello! I'm your friendly chatbot. I'm here to help answer your questio
 load_dotenv()
 
 # OpenAI API key
-OPENAI_API_KEY = st.secrets["api_keys"]["OPENAI_API_KEY"]
+#OPENAI_API_KEY = st.secrets["api_keys"]["OPENAI_API_KEY"]
 #Groq API KEY
-GROQ_API_KEY = st.secrets["api_keys"]["GROQ_API_KEY"]
+#GROQ_API_KEY = st.secrets["api_keys"]["GROQ_API_KEY"]
+
+OPENAI_API_KEY = os.getenv("My_OpenAI_API_key")
+GROQ_API_KEY = os.getenv("My_Groq_API_key")
+
 # Model selection
 model_options = ["gpt-4o", "gpt-4", "llama3-70b-8192", "llama3-8b-8192"]
 selected_model = st.sidebar.selectbox("Select a model", model_options)
@@ -59,9 +63,9 @@ def get_model(selected_model):
     elif selected_model == "gpt-4":
         return ChatOpenAI(model="gpt-4", temperature=0, max_tokens=None, timeout=None, max_retries=2, api_key=OPENAI_API_KEY)
     elif selected_model == "llama3-70b-8192":
-        return ChatGroq(groq_api_key=GROQ_API_KEY,model="llama3-70b-8192", temperature=0.02, max_tokens=None, timeout=None, max_retries=2)
+        return ChatGroq(groq_api_key=GROQ_API_KEY, model="llama3-70b-8192", temperature=0.02, max_tokens=None, timeout=None, max_retries=2)
     elif selected_model == "llama3-8b-8192":
-        return ChatGroq(groq_api_key=GROQ_API_KEY,model="llama3-8b-8192", temperature=0.02, max_tokens=None, timeout=None, max_retries=2)
+        return ChatGroq(groq_api_key=GROQ_API_KEY, model="llama3-8b-8192", temperature=0.02, max_tokens=None, timeout=None, max_retries=2)
     else:
         raise ValueError("Invalid model selected")
 
@@ -101,7 +105,7 @@ Your primary tasks involve providing scholarship and funding information for use
    - Before providing detailed application support, make sure to show the summary of data and steps going to be submitted.
 
 8. **Off-topic Handling**:
-   - If the user asks a question that is not related to scholarships funding, funding fellowships, and other academics disucssion (except greetings and compliments for you), respond with: 
+   - If the user asks a question that is not related to scholarships, funding, funding fellowships, and other academics disucssion (except greetings and compliments for you), respond with: 
      "Sorry, but i'm here to assist you with scholarship, funding and related information. If you have any questions related to these topics, please feel free to ask!"
 
 9. **Academic Inquiry**:
@@ -124,8 +128,7 @@ Your primary tasks involve providing scholarship and funding information for use
 11. **Capability Confirmation**:
    - If the user wanted to confirm whether you're trained specifically for scholarships (e.g., So, does that mean you're trained only for scholerships?) or other confirmation related to your capability and usefulness discussion (except greetings and compliments for you), respond with: 
      "Yes, I was trained to assist with only scholarships and educational related content. If you have any questions related to these topics, please feel free to ask!"
-
-
+     
 You must follow this rule for handling multiple function calls in a single message:
 
 1. For any "create" function (e.g., creating an application profile, creating a list of scholarships), you must first summarize the data and present it to the user for confirmation.
@@ -161,6 +164,7 @@ If the user responds with "Yes," proceed with providing detailed guidance. If th
 # Initialize the conversation memory
 #conversational_memory_length = 100
 #memory = ConversationBufferWindowMemory(k=conversational_memory_length, memory_key="chat_history", return_messages=True)
+
 memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
 
 # Initialize chat history
