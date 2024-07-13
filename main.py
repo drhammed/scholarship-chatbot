@@ -45,27 +45,27 @@ st.write("Hello! I'm your friendly chatbot. I'm here to help answer your questio
 load_dotenv()
 
 # OpenAI API key
-OPENAI_API_KEY = st.secrets["api_keys"]["OPENAI_API_KEY"]
+#OPENAI_API_KEY = st.secrets["api_keys"]["OPENAI_API_KEY"]
 #Groq API KEY
-GROQ_API_KEY = st.secrets["api_keys"]["GROQ_API_KEY"]
+#GROQ_API_KEY = st.secrets["api_keys"]["GROQ_API_KEY"]
 
-#OPENAI_API_KEY = os.getenv("My_OpenAI_API_key")
-#GROQ_API_KEY = os.getenv("My_Groq_API_key")
+OPENAI_API_KEY = os.getenv("My_OpenAI_API_key")
+GROQ_API_KEY = os.getenv("My_Groq_API_key")
 
 # Model selection
-model_options = ["gpt-4o", "gpt-4", "llama3-70b-8192", "llama3-8b-8192"]
+model_options = ["llama3-70b-8192", "llama3-8b-8192","gpt-4o", "gpt-4"]
 selected_model = st.sidebar.selectbox("Select a model", model_options)
 
 # Initialize selected model
 def get_model(selected_model):
-    if selected_model == "gpt-4o":
+    if selected_model == "llama3-70b-8192":
+        return ChatGroq(groq_api_key=GROQ_API_KEY, model="llama3-70b-8192", temperature=0.02, max_tokens=None, timeout=None, max_retries=2) 
+    elif selected_model == "llama3-8b-8192":
+        return ChatGroq(groq_api_key=GROQ_API_KEY, model="llama3-8b-8192", temperature=0.02, max_tokens=None, timeout=None, max_retries=2)
+    elif selected_model ==  "gpt-4o":
         return ChatOpenAI(model="gpt-4o", temperature=0, max_tokens=None, timeout=None, max_retries=2, api_key=OPENAI_API_KEY)
     elif selected_model == "gpt-4":
         return ChatOpenAI(model="gpt-4", temperature=0, max_tokens=None, timeout=None, max_retries=2, api_key=OPENAI_API_KEY)
-    elif selected_model == "llama3-70b-8192":
-        return ChatGroq(groq_api_key=GROQ_API_KEY, model="llama3-70b-8192", temperature=0.02, max_tokens=None, timeout=None, max_retries=2)
-    elif selected_model == "llama3-8b-8192":
-        return ChatGroq(groq_api_key=GROQ_API_KEY, model="llama3-8b-8192", temperature=0.02, max_tokens=None, timeout=None, max_retries=2)
     else:
         raise ValueError("Invalid model selected")
 
@@ -143,7 +143,8 @@ Here's how you should handle it:
 . If the user already confirmed (including if there first messages is detailed enough that they're looking for scholarships and they already shared their profile with you), continue the conversation and proceed with detailed guidance, like how to apply, deadline of the scholarships, tips for writing statement of purpose/motivational statement" and if needed by the scholarship, how to contact a Professor
 . Continues the conversation until you provide ALL the needed assistance to make a solid scholarship application or till the user is satisfied and end the chat.
 
-Example interaction-This Example interaction is for you ONLY- On NO condition should you provide it as a response for the bot if they ask you for "example" or "sample" of anything!!!:
+Example interaction-This Example interaction is for you ONLY- On NO condition should you provide it as a response for the bot if they ask you for "example", "sample" or "template" of anything!!!:
+Again, don't provide this example interaction as a response for ANY USER when they ask for "sample", "example", "template" of ANYTHING!!!
 1. User requests information on scholarships for a master's program in computer science.
 2. Assistant asks for details about the user's profile and preferences.
 
@@ -165,7 +166,6 @@ Assistant: "Proceeding with detailed guidance, like how to apply, deadline of th
 If the user responds with "Yes," Proceed with detailed guidance, like how to apply, deadline of the scholarships, tips for writing statement of purpose/motivational statement" and if needed by the scholarship, how to contact a Professor. If the user responds with "No" or requests changes at any step, update the data and seek confirmation again.
 
 Ensure the conversation continues until you provide the needed assistance to make a solid scholarship application or till the user is satisfied and end the chat.
-
 """
 
 # Initialize the conversation memory
