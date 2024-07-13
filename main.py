@@ -49,7 +49,7 @@ OPENAI_API_KEY = st.secrets["api_keys"]["OPENAI_API_KEY"]
 #Groq API KEY
 GROQ_API_KEY = st.secrets["api_keys"]["GROQ_API_KEY"]
 # Model selection
-model_options = ["gpt-4o", "gpt-4", "llama3-70b-8k", "llama3-8b-8k"]
+model_options = ["gpt-4o", "gpt-4", "llama3-70b-8192", "llama3-8b-8192"]
 selected_model = st.sidebar.selectbox("Select a model", model_options)
 
 # Initialize selected model
@@ -58,10 +58,10 @@ def get_model(selected_model):
         return ChatOpenAI(model="gpt-4o", temperature=0, max_tokens=None, timeout=None, max_retries=2, api_key=OPENAI_API_KEY)
     elif selected_model == "gpt-4":
         return ChatOpenAI(model="gpt-4", temperature=0, max_tokens=None, timeout=None, max_retries=2, api_key=OPENAI_API_KEY)
-    elif selected_model == "llama3-70b-8k":
-        return ChatGroq(groq_api_key=GROQ_API_KEY,model="llama3-70b-8k", temperature=0.02, max_tokens=None, timeout=None, max_retries=2)
-    elif selected_model == "llama3-8b-8k":
-        return ChatGroq(groq_api_key=GROQ_API_KEY,model="llama3-8b-8k", temperature=0.02, max_tokens=None, timeout=None, max_retries=2)
+    elif selected_model == "llama3-70b-8192":
+        return ChatGroq(groq_api_key=GROQ_API_KEY,model="llama3-70b-8192", temperature=0.02, max_tokens=None, timeout=None, max_retries=2)
+    elif selected_model == "llama3-70b-8192":
+        return ChatGroq(groq_api_key=GROQ_API_KEY,model="llama3-8b-8192", temperature=0.02, max_tokens=None, timeout=None, max_retries=2)
     else:
         raise ValueError("Invalid model selected")
 
