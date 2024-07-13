@@ -42,16 +42,22 @@ st.title("Scholarship Chatbot by drhammed")
 st.write("Hello! I'm your friendly chatbot. I'm here to help answer your questions regarding scholarships and funding for students, and provide information. I'm also super fast! Let's start!")
 
 # Load environment variables from .env file
-#load_dotenv()
+load_dotenv()
 
 # OpenAI API key
 OPENAI_API_KEY = st.secrets["api_keys"]["OPENAI_API_KEY"]
 #Groq API KEY
 GROQ_API_KEY = st.secrets["api_keys"]["GROQ_API_KEY"]
 
-# Model selection
-model_options = ["gpt-4o", "gpt-4", "llama3-70b-8192", "llama3-8b-8192"]
-selected_model = st.selectbox("Select a model", model_options)
+# Header section with model selection
+header = st.container()
+with header:
+    col1, col2 = st.columns([1, 4])
+    with col1:
+        model_options = ["gpt-4o", "gpt-4", "llama3-70b-8192", "llama3-8b-8192"]
+        selected_model = st.selectbox("Select a model", model_options)
+    with col2:
+        st.write(" ")
 
 # Initialize selected model
 def get_model(selected_model):
