@@ -32,6 +32,7 @@ from langchain.chains.conversation.memory import ConversationBufferWindowMemory
 from langchain_groq import ChatGroq
 import uuid
 from datetime import datetime, timedelta
+
 # Ignore all warnings
 warnings.filterwarnings("ignore")
 
@@ -43,16 +44,10 @@ st.write("Hello! I'm your friendly chatbot. I'm here to help answer your questio
 # Load environment variables from .env file
 load_dotenv()
 
-#OpenAI model
+# OpenAI model
 OPENAI_API_KEY = st.secrets["api_keys"]["OPENAI_API_KEY"]
 # Initialize OpenAI model
 llm_mod = ChatOpenAI(model="gpt-4o", temperature=0, max_tokens=None, timeout=None, max_retries=2, api_key=OPENAI_API_KEY)
-
-## If using Groq- Get Groq API key from environment variable
-#GROQ_API_KEY = st.secrets["api_keys"]["GROQ_API_KEY"]
-#model = 'llama3-70b-8192'
-## Initialize Groq Langchain chat object and conversation
-#llm_mod = ChatGroq(groq_api_key=GROQ_API_KEY, model_name=model, temperature=0.02)
 
 system_prompt = """
 Your primary tasks involve providing scholarship and funding information for users. Follow these steps for each task:
@@ -120,13 +115,9 @@ If the user responds with "Yes," proceed with providing detailed guidance. If th
 """
 
 # Initialize the conversation memory
-#memory = ConversationBufferMemory()
-
 conversational_memory_length = 10
+memory = ConversationBufferWindowMemory(k=conversational_memory_length, memory_key="chat_history", return_messages=True)
 
-memory = ConversationBufferWindowMemory(k=conversational_memory_length,
-                                            memory_key="chat_history",
-                                            return_messages=True)
 # Initialize chat history
 if 'messages' not in st.session_state:
     st.session_state['messages'] = []
@@ -150,10 +141,16 @@ if 'conversation_state' not in st.session_state:
 def get_readable_date():
     return datetime.now().strftime("%Y-%m-%d")
 
-# Function to generate a unique session name based on the first user query
+# Function to generate a summary of the user's first query
+def generate_summary(user_input):
+    summary_prompt = f"Summarize this query in a few words: {user_input}"
+    summary_response = llm_mod.predict(summary_prompt)
+    return summary_response.strip()
+
+# Function to generate a unique session name based on the summary of the user's first query
 def generate_session_name(user_input):
-    session_name = user_input[:30]
-    return session_name
+    summary = generate_summary(user_input)
+    return summary
 
 # Function to save the current session
 def save_current_session():
@@ -193,19 +190,19 @@ for message in st.session_state['messages']:
         st.markdown(message['content'])
 
 def clear_input():
-        st.session_state.user_input = ''
+    st.session_state.user_input = ''
 
 if 'user_input' not in st.session_state:
-        st.session_state.user_input = ''
+    st.session_state.user_input = ''
 
 user_question = st.chat_input("You: ")
 
 if user_question:
     st.session_state.user_input = user_question
 
-    # Set session name based on the first user input
+    # Set session name based on the summary of the first user input
     if st.session_state.current_session_name is None:
-            st.session_state.current_session_name = generate_session_name(st.session_state.user_input)
+        st.session_state.current_session_name = generate_session_name(st.session_state.user_input)
     
     # Add user message to chat history
     st.session_state["messages"].append({"role": "user", "content": st.session_state.user_input})
@@ -215,40 +212,37 @@ if user_question:
         st.markdown(st.session_state.user_input)
         
     if st.session_state.conversation_state == "start":
-            prompt = ChatPromptTemplate.from_messages([
-                SystemMessage(content=system_prompt),
-                MessagesPlaceholder(variable_name="chat_history"),
-                HumanMessagePromptTemplate.from_template("{human_input}"),
-            ])
+        prompt = ChatPromptTemplate.from_messages([
+            SystemMessage(content=system_prompt),
+            MessagesPlaceholder(variable_name="chat_history"),
+            HumanMessagePromptTemplate.from_template("{human_input}"),
+        ])
 
     elif st.session_state.conversation_state == "awaiting_confirmation":
-            prompt = ChatPromptTemplate.from_messages([
-                SystemMessage(content=system_prompt),
-                MessagesPlaceholder(variable_name="chat_history"),
-                HumanMessagePromptTemplate.from_template("{human_input}"),
-                HumanMessagePromptTemplate.from_template("The user has confirmed the scholarships. Proceed with application guidance."),
-            ])
+        prompt = ChatPromptTemplate.from_messages([
+            SystemMessage(content=system_prompt),
+            MessagesPlaceholder(variable_name="chat_history"),
+            HumanMessagePromptTemplate.from_template("{human_input}"),
+            HumanMessagePromptTemplate.from_template("The user has confirmed the scholarships. Proceed with application guidance."),
+        ])
         
     conversation = LLMChain(
-            llm=llm_mod,
-            prompt=prompt,
-            verbose=False,
-            memory=memory,
+        llm=llm_mod,
+        prompt=prompt,
+        verbose=False,
+        memory=memory,
     )
 
     with st.spinner("Thinking..."):
         try:
             response = conversation.predict(human_input=st.session_state.user_input)
             if "Do you confirm the above data?" in response:
-                    st.session_state.conversation_state = "awaiting_confirmation"
+                st.session_state.conversation_state = "awaiting_confirmation"
             elif "Proceeding with detailed guidance" in response:
-                    st.session_state.conversation_state = "providing_guidance"
+                st.session_state.conversation_state = "providing_guidance"
         except Exception as e:
             st.error(f"An error occurred: {str(e)}")
             response = "Sorry, I'm having trouble processing your request right now. Please try again later."
-
-    #st.session_state.chat_history.append(("User", st.session_state.user_input))
-    #st.session_state.chat_history.append(("Chatbot", response))
 
     # Add bot response to chat history
     st.session_state['messages'].append({"role": "assistant", "content": response})
