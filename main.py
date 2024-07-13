@@ -36,13 +36,9 @@ from datetime import datetime, timedelta
 # Ignore all warnings
 warnings.filterwarnings("ignore")
 
-# Set up Streamlit app
-st.set_page_config(page_title="Scholarship Chatbot by drhammed", layout="wide")
-st.title("Scholarship Chatbot by drhammed")
-st.write("Hello! I'm your friendly chatbot. I'm here to help answer your questions regarding scholarships and funding for students, and provide information. I'm also super fast! Let's start!")
 
 # Load environment variables from .env file
-load_dotenv()
+#load_dotenv()
 
 # OpenAI API key
 OPENAI_API_KEY = st.secrets["api_keys"]["OPENAI_API_KEY"]
@@ -67,6 +63,12 @@ def get_model(selected_model):
         raise ValueError("Invalid model selected")
 
 llm_mod = get_model(selected_model)
+
+# Set up Streamlit app
+st.set_page_config(page_title="Scholarship Chatbot by drhammed", layout="wide")
+st.title("Scholarship Chatbot by drhammed")
+st.write("Hello! I'm your friendly chatbot. I'm here to help answer your questions regarding scholarships and funding for students, and provide information. I'm also super fast! Let's start!")
+
 
 system_prompt = """
 Your primary tasks involve providing scholarship and funding information for users. Follow these steps for each task:
