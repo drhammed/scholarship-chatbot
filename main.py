@@ -38,16 +38,6 @@ warnings.filterwarnings("ignore")
 
 # Set up Streamlit app
 st.set_page_config(page_title="Scholarship Chatbot by drhammed", layout="wide")
-st.title("Scholarship Chatbot by drhammed")
-st.write("Hello! I'm your friendly chatbot. I'm here to help answer your questions regarding scholarships and funding for students, and provide information. I'm also super fast! Let's start!")
-
-# Load environment variables from .env file
-load_dotenv()
-
-# OpenAI API key
-OPENAI_API_KEY = st.secrets["api_keys"]["OPENAI_API_KEY"]
-#Groq API KEY
-GROQ_API_KEY = st.secrets["api_keys"]["GROQ_API_KEY"]
 
 # Header section with model selection
 header = st.container()
@@ -58,6 +48,19 @@ with header:
         selected_model = st.selectbox("Select a model", model_options)
     with col2:
         st.write(" ")
+
+st.title("Scholarship Chatbot by drhammed")
+st.write("Hello! I'm your friendly chatbot. I'm here to help answer your questions regarding scholarships and funding for students, and provide information. I'm also super fast! Let's start!")
+
+
+# Load environment variables from .env file
+load_dotenv()
+
+# OpenAI API key
+OPENAI_API_KEY = st.secrets["api_keys"]["OPENAI_API_KEY"]
+#Groq API KEY
+GROQ_API_KEY = st.secrets["api_keys"]["GROQ_API_KEY"]
+
 
 # Initialize selected model
 def get_model(selected_model):
