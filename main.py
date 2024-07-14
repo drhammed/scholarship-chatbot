@@ -49,6 +49,7 @@ OPENAI_API_KEY = st.secrets["api_keys"]["OPENAI_API_KEY"]
 #Groq API KEY
 GROQ_API_KEY = st.secrets["api_keys"]["GROQ_API_KEY"]
 
+#For Heroku & Local deployment
 #OPENAI_API_KEY = os.getenv("My_OpenAI_API_key")
 #GROQ_API_KEY = os.getenv("My_Groq_API_key")
 
