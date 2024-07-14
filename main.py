@@ -1,18 +1,18 @@
 import streamlit as st
-from langchain_voyageai import VoyageAIEmbeddings
-import os
-import json
-import boto3
+#from langchain_voyageai import VoyageAIEmbeddings
+#import os
+#import json
+#import boto3
 from dotenv import load_dotenv
-from urllib.parse import urlparse
-from pinecone import Pinecone
-import pinecone
+#from urllib.parse import urlparse
+#from pinecone import Pinecone
+#import pinecone
 from langchain_openai import ChatOpenAI
 import openai
 from groq import Groq
 from langchain.chains import LLMChain, RetrievalQA
-import time
-import re
+#import time
+#import re
 import warnings
 from langchain_pinecone import PineconeVectorStore
 from langchain.memory import ConversationBufferMemory
