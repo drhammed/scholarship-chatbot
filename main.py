@@ -44,6 +44,7 @@ st.write("Hello! I'm your friendly chatbot. I'm here to help answer your questio
 # Load environment variables from .env file
 load_dotenv()
 
+#For Streamlit & AWS
 #OpenAI API key
 OPENAI_API_KEY = st.secrets["api_keys"]["OPENAI_API_KEY"]
 #Groq API KEY
