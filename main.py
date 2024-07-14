@@ -1,6 +1,6 @@
 import streamlit as st
 #from langchain_voyageai import VoyageAIEmbeddings
-#import os
+import os
 #import json
 #import boto3
 from dotenv import load_dotenv
