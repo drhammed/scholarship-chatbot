@@ -46,18 +46,13 @@ load_dotenv()
 
 #For Streamlit & AWS
 #OpenAI API key
-#OPENAI_API_KEY = st.secrets["api_keys"]["OPENAI_API_KEY"]
+OPENAI_API_KEY = st.secrets["api_keys"]["OPENAI_API_KEY"]
 #Groq API KEY
-#GROQ_API_KEY = st.secrets["api_keys"]["GROQ_API_KEY"]
+GROQ_API_KEY = st.secrets["api_keys"]["GROQ_API_KEY"]
 
-<<<<<<< HEAD
 #For Heroku & Local deployment
 #OPENAI_API_KEY = os.getenv("My_OpenAI_API_key")
 #GROQ_API_KEY = os.getenv("My_Groq_API_key")
-=======
-OPENAI_API_KEY = os.getenv("My_OpenAI_API_key")
-GROQ_API_KEY = os.getenv("My_Groq_API_key")
->>>>>>> 77f906c401f364533eb6b9832c882b342aacc071
 
 # Model selection
 model_options = ["llama3-70b-8192", "llama3-8b-8192","gpt-4o", "gpt-4"]
