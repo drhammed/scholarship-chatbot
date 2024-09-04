@@ -28,6 +28,7 @@ from langchain_core.prompts import (
     MessagesPlaceholder,
 )
 from langchain_core.messages import SystemMessage
+from langchain.prompts import SystemMessagePromptTemplate
 from langchain.chains.conversation.memory import ConversationBufferWindowMemory
 from langchain_groq import ChatGroq
 import uuid
