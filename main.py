@@ -152,6 +152,18 @@ Answer the above question with Y or N at each output.
 
 memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
 
+# Create a conversation chain
+conversation = ConversationChain(
+    llm=llm_mod,
+    memory=memory,
+        prompt=ChatPromptTemplate.from_messages([
+            SystemMessagePromptTemplate.from_template(system_prompt),
+            MessagesPlaceholder(variable_name="chat_history"),
+            HumanMessagePromptTemplate.from_template("{input}")
+        ]),
+        verbose=False
+    )
+
 # Initialize chat history
 if 'messages' not in st.session_state:
     st.session_state['messages'] = []
@@ -218,7 +230,7 @@ def display_chat_sessions():
 # Display saved chat sessions in the sidebar
 display_chat_sessions()
 
-# Display chat messages from history
+# Display chat messages from history.
 for message in st.session_state['messages']:
     with st.chat_message(message['role']):
         st.markdown(message['content'])
@@ -259,13 +271,6 @@ if user_question:
             HumanMessagePromptTemplate.from_template("{human_input}"),
             HumanMessagePromptTemplate.from_template("The user has confirmed the scholarships. Proceed with application guidance."),
         ])
-        
-    conversation = LLMChain(
-        llm=llm_mod,
-        prompt=prompt,
-        verbose=False,
-        memory=memory,
-    )
 
     with st.spinner("Thinking..."):
         try:
