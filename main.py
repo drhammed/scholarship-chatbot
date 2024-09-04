@@ -157,14 +157,14 @@ memory = ConversationBufferMemory(memory_key="chat_history", return_messages=Tru
 conversation = ConversationChain(
     llm=llm_mod,
     memory=memory,
-        prompt=ChatPromptTemplate.from_messages([
-            SystemMessagePromptTemplate.from_template(system_prompt),
+        prompt = ChatPromptTemplate.from_messages([
+            ("system", system_prompt),
             MessagesPlaceholder(variable_name="chat_history"),
-            HumanMessagePromptTemplate.from_template("{human_input}")
+            ("human", "{human_input}")
         ]),
-        verbose=False
-    )
-
+    verbose=False
+)
+    
 # Initialize chat history
 if 'messages' not in st.session_state:
     st.session_state['messages'] = []
