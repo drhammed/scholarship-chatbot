@@ -161,10 +161,9 @@ conversation = ConversationChain(
             ("system", system_prompt),
             MessagesPlaceholder(variable_name="chat_history"),
             ("human", "{human_input}")
-        ]),
-    verbose=False
+        ])
 )
-    
+
 # Initialize chat history
 if 'messages' not in st.session_state:
     st.session_state['messages'] = []
