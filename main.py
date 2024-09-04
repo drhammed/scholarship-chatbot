@@ -160,7 +160,7 @@ conversation = ConversationChain(
         prompt=ChatPromptTemplate.from_messages([
             SystemMessagePromptTemplate.from_template(system_prompt),
             MessagesPlaceholder(variable_name="chat_history"),
-            HumanMessagePromptTemplate.from_template("{input}")
+            HumanMessagePromptTemplate.from_template("{human_input}")
         ]),
         verbose=False
     )
