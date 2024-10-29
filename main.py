@@ -191,8 +191,7 @@ Here's how you should handle it:
    - Assistant: "Great! Here's how you can apply for Scholarship A and Scholarship B..."
 
 Example interaction-This Example interaction is for you ONLY- On NO condition should you provide it as a response for the bot if they ask you for "example", "sample" or "template" of anything!!!:
-Again, don't provide this example interaction as a response for ANY USER when they ask for "sample", "example", "template" of ANYTHING!!!
-**Remember, do not share this example/sample/template interaction with users under any circumstances.**
+**Remember, do not provide this example interaction as a response for ANY USER when they ask for "sample", "example", "template" of ANYTHING!!!**
 
 
 """
