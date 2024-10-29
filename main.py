@@ -20,6 +20,8 @@ from langchain.chains.conversation.memory import ConversationBufferWindowMemory
 from langchain_groq import ChatGroq
 import uuid
 from datetime import datetime, timedelta
+import logging
+from typing import List, Union
 
 # Ignore all warnings
 warnings.filterwarnings("ignore")
@@ -32,6 +34,7 @@ st.write("Hello! I'm your friendly chatbot. I'm here to help answer your questio
 # Load environment variables from .env file
 load_dotenv()
 
+
 #For Streamlit & AWS
 #OpenAI API key
 OPENAI_API_KEY = st.secrets["api_keys"]["OPENAI_API_KEY"]
@@ -43,21 +46,67 @@ GROQ_API_KEY = st.secrets["api_keys"]["GROQ_API_KEY"]
 model_options = ["llama3-70b-8192", "llama3-8b-8192","llama-3.2-1b-preview", "llama-3.2-3b-preview"]
 selected_model = st.sidebar.selectbox("Select a model", model_options)
 
-# Initialize selected model
 
-def get_model(selected_model):
-        if selected_model == "llama3-8b-8192":
-            return ChatGroq(groq_api_key=GROQ_API_KEY, model="llama3-8b-8192", temperature=0.02, max_tokens=None, timeout=None, max_retries=2)
-        elif selected_model == "llama3-70b-8192":
-            return ChatGroq(groq_api_key=GROQ_API_KEY, model="llama3-70b-8192", temperature=0.02, max_tokens=None, timeout=None, max_retries=2)
-        elif selected_model == "llama-3.2-1b-preview":
-            return ChatGroq(groq_api_key=GROQ_API_KEY, model="llama-3.2-1b-preview", temperature=0.02, max_tokens=None, timeout=None, max_retries=2)
-        elif selected_model == "llama-3.2-3b-preview":
-            return ChatGroq(groq_api_key=GROQ_API_KEY, model="llama-3.2-3b-preview", temperature=0.02, max_tokens=None, timeout=None, max_retries=2)
-        else:
-            raise ValueError("Invalid model selected")
+
+# Initialize logger
+logger = logging.getLogger(__name__)
+
+def get_model(selected_model, stop_sequences: Union[List[str], str, None] = None) -> ChatGroq:
+    """
+    Returns a ChatGroq model instance based on the selected model name.
+
+    Args:
+        selected_model (str): The identifier for the desired model.
+        stop_sequences (List[str] | str | None, optional): Sequences where the model should stop generating further tokens. Defaults to None.
+
+    Returns:
+        ChatGroq: An instance of the ChatGroq model configured with the specified parameters.
+
+    Raises:
+        ValueError: If an invalid model is selected.
+        TypeError: If stop_sequences is not a list of strings, a string, or None.
+        EnvironmentError: If GROQ_API_KEY is not set.
+    """
+    if not GROQ_API_KEY:
+        raise EnvironmentError("GROQ_API_KEY is not set")
+
+    if stop_sequences is None:
+        stop_sequences = []
+    elif isinstance(stop_sequences, str):
+        stop_sequences = [stop_sequences]
+    elif not isinstance(stop_sequences, list) or not all(isinstance(s, str) for s in stop_sequences):
+        raise TypeError("stop_sequences must be a list of strings, a string, or None")
+    
+    logger.debug(f"Loading model: {selected_model} with stop_sequences: {stop_sequences}")
+
+    common_params = {
+        "groq_api_key": GROQ_API_KEY,
+        "temperature": 0.02,
+        "max_tokens": None,
+        "timeout": None,
+        "max_retries": 2,
+        "stop_sequences": stop_sequences
+    }
+
+    model_mapping = {
+        "llama3-8b-8192": "llama3-8b-8192",
+        "llama3-70b-8192": "llama3-70b-8192",
+        "llama-3.2-1b-preview": "llama-3.2-1b-preview",
+        "llama-3.2-3b-preview": "llama-3.2-3b-preview",
+    }
+
+    if selected_model in model_mapping:
+        return ChatGroq(
+            model=model_mapping[selected_model],
+            **common_params
+        )
+    else:
+        logger.error(f"Invalid model selected: {selected_model}")
+        raise ValueError("Invalid model selected")
+
 
 llm_mod = get_model(selected_model)
+
 
 system_prompt = """
 Your primary tasks involve providing scholarship and funding information for users. Follow these steps for each task:
@@ -156,11 +205,14 @@ If the user responds with "Yes," Proceed with detailed guidance, like how to app
 Ensure the conversation continues until you provide the needed assistance to make a solid scholarship application or till the user is satisfied and end the chat.
 """
 
+
+
 # Initialize the conversation memory
 #conversational_memory_length = 100
 #memory = ConversationBufferWindowMemory(k=conversational_memory_length, memory_key="chat_history", return_messages=True)
 
 memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
+
 
 # Initialize chat history
 if 'messages' not in st.session_state:
@@ -181,6 +233,7 @@ if 'user_input' not in st.session_state:
 if 'conversation_state' not in st.session_state:
     st.session_state['conversation_state'] = "start"
 
+
 # Function to get today's date in a readable format
 def get_readable_date():
     return datetime.now().strftime("%Y-%m-%d")
@@ -195,6 +248,7 @@ def generate_summary(user_input):
 def generate_session_name(user_input):
     summary = generate_summary(user_input)
     return summary
+
 
 # Function to save the current session
 def save_current_session():
@@ -228,27 +282,32 @@ def display_chat_sessions():
 # Display saved chat sessions in the sidebar
 display_chat_sessions()
 
+
 # Display chat messages from history
 for message in st.session_state['messages']:
     with st.chat_message(message['role']):
         st.markdown(message['content'])
 
+
 def clear_input():
     st.session_state.user_input = ''
+
 
 if 'user_input' not in st.session_state:
     st.session_state.user_input = ''
 
 user_question = st.chat_input("You: ")
 
+
+
 if user_question:
     st.session_state.user_input = user_question
 
-    # Set session name based on the summary of the first user input
+   # Set session name based on the summary of the first user input
     if st.session_state.current_session_name is None:
         st.session_state.current_session_name = generate_session_name(st.session_state.user_input)
-    
-    # Add user message to chat history
+        
+        # Add user message to chat history
     st.session_state["messages"].append({"role": "user", "content": st.session_state.user_input})
     
     # Display user message
@@ -261,7 +320,7 @@ if user_question:
             MessagesPlaceholder(variable_name="chat_history"),
             HumanMessagePromptTemplate.from_template("{human_input}"),
         ])
-
+        
     elif st.session_state.conversation_state == "awaiting_confirmation":
         prompt = ChatPromptTemplate.from_messages([
             SystemMessage(content=system_prompt),
@@ -272,11 +331,12 @@ if user_question:
         
     conversation = LLMChain(
         llm=llm_mod,
-        prompt=prompt,
+        prompt=system_prompt,
         verbose=False,
         memory=memory,
     )
-
+    
+    
     with st.spinner("Thinking..."):
         try:
             response = conversation.predict(human_input=st.session_state.user_input)
@@ -289,9 +349,10 @@ if user_question:
         except Exception as e:
             st.error(f"An error occurred: {str(e)}")
             response = "Sorry, I'm having trouble processing your request right now. Please try again later."
-
+            
     # Add bot response to chat history
     st.session_state['messages'].append({"role": "assistant", "content": response})
+    
     
     # Display bot response
     with st.chat_message("assistant"):
