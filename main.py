@@ -328,10 +328,29 @@ if user_question:
             HumanMessagePromptTemplate.from_template("{human_input}"),
             HumanMessagePromptTemplate.from_template("The user has confirmed the scholarships. Proceed with application guidance."),
         ])
+    
+    elif st.session_state.conversation_state == "providing_guidance":
+        # Define a prompt suitable for providing detailed guidance
+        prompt = ChatPromptTemplate.from_messages([
+            SystemMessage(content=system_prompt),
+            MessagesPlaceholder(variable_name="chat_history"),
+            HumanMessagePromptTemplate.from_template("{human_input}"),
+            HumanMessagePromptTemplate.from_template("Proceeding with detailed guidance on the scholarship application process."),
+        ])
         
+    else:
+        # Handle any unexpected conversation states
+        st.warning(f"Unexpected conversation state: {st.session_state.conversation_state}. Resetting to 'start'.")
+        st.session_state.conversation_state = "start"
+        prompt = ChatPromptTemplate.from_messages([
+            SystemMessage(content=system_prompt),
+            MessagesPlaceholder(variable_name="chat_history"),
+            HumanMessagePromptTemplate.from_template("{human_input}"),
+        ])
+       
     conversation = LLMChain(
         llm=llm_mod,
-        prompt="prompt",
+        prompt=prompt,
         verbose=False,
         memory=memory,
     )
