@@ -56,23 +56,25 @@ GROQ_API_KEY = st.secrets["api_keys"]["GROQ_API_KEY"]
 #GROQ_API_KEY = os.getenv("My_Groq_API_key")
 
 # Model selection
-model_options = ["llama3-70b-8192", "llama3-8b-8192","gpt-4o", "gpt-4"]
+model_options = ["llama3-70b-8192", "llama3-8b-8192","llama-3.2-1b-preview", "llama-3.2-3b-preview"]
 selected_model = st.sidebar.selectbox("Select a model", model_options)
 
 # Initialize selected model
+
 def get_model(selected_model):
-    if selected_model == "llama3-70b-8192":
-        return ChatGroq(groq_api_key=GROQ_API_KEY, model="llama3-70b-8192", temperature=0.02, max_tokens=None, timeout=None, max_retries=2) 
-    elif selected_model == "llama3-8b-8192":
-        return ChatGroq(groq_api_key=GROQ_API_KEY, model="llama3-8b-8192", temperature=0.02, max_tokens=None, timeout=None, max_retries=2)
-    elif selected_model ==  "gpt-4o":
-        return ChatOpenAI(model="gpt-4o", temperature=0, max_tokens=None, timeout=None, max_retries=2, api_key=OPENAI_API_KEY)
-    elif selected_model == "gpt-4":
-        return ChatOpenAI(model="gpt-4", temperature=0, max_tokens=None, timeout=None, max_retries=2, api_key=OPENAI_API_KEY)
-    else:
-        raise ValueError("Invalid model selected")
+        if selected_model == "llama3-8b-8192":
+            return ChatGroq(groq_api_key=GROQ_API_KEY, model="llama3-8b-8192", temperature=0.02, max_tokens=None, timeout=None, max_retries=2)
+        elif selected_model == "llama3-70b-8192":
+            return ChatGroq(groq_api_key=GROQ_API_KEY, model="llama3-70b-8192", temperature=0.02, max_tokens=None, timeout=None, max_retries=2)
+        elif selected_model == "llama-3.2-1b-preview":
+            return ChatGroq(groq_api_key=GROQ_API_KEY, model="llama-3.2-1b-preview", temperature=0.02, max_tokens=None, timeout=None, max_retries=2)
+        elif selected_model == "llama-3.2-3b-preview":
+            return ChatGroq(groq_api_key=GROQ_API_KEY, model="llama-3.2-3b-preview", temperature=0.02, max_tokens=None, timeout=None, max_retries=2)
+        else:
+            raise ValueError("Invalid model selected")
 
 llm_mod = get_model(selected_model)
+
 
 system_prompt = """
 <rules>
@@ -108,7 +110,7 @@ system_prompt = """
     - Continuity: Maintain a continuous, context-aware conversation, ensuring the user’s needs are met without redundant inquiries.
     - Action Confirmation: Confirm each step with the user before proceeding to the next phase of guidance or application support.
     - Completion: Provide a clear summary of the identified scholarships and the next steps for the user to follow.
-
+  
   </core>
   
   <think>
@@ -120,15 +122,15 @@ system_prompt = """
   </expand>
   
   <loop>
-    while(true) {
+    while(true) {{
       gather_user_information();
       confirm_data_with_user();
-      if(user_confirms_data()) { 
+      if(user_confirms_data()) {{ 
         present_scholarship_options();
         provide_detailed_guidance();
-      }
+      }}
       break_if_user_satisfied();
-    }
+    }}
   </loop>
   
   <verify>
@@ -147,22 +149,26 @@ Answer the above question with Y or N at each output.
 
 """
 
+
+
 # Initialize the conversation memory
 #conversational_memory_length = 100
 #memory = ConversationBufferWindowMemory(k=conversational_memory_length, memory_key="chat_history", return_messages=True)
 
 memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
 
+
 # Create a conversation chain
 conversation = ConversationChain(
     llm=llm_mod,
     memory=memory,
-        prompt = ChatPromptTemplate.from_messages([
-            ("system", system_prompt),
-            MessagesPlaceholder(variable_name="chat_history"),
-            ("human", "{human_input}")
-        ])
+    prompt=ChatPromptTemplate.from_messages([
+        ("system", system_prompt),
+        MessagesPlaceholder(variable_name="chat_history"),
+        ("human", "{human_input}")
+    ])
 )
+
 
 # Initialize chat history
 if 'messages' not in st.session_state:
