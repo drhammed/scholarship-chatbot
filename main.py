@@ -331,7 +331,7 @@ if user_question:
         
     conversation = LLMChain(
         llm=llm_mod,
-        prompt=system_prompt,
+        prompt="prompt",
         verbose=False,
         memory=memory,
     )
