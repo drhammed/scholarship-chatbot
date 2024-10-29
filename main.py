@@ -43,7 +43,7 @@ GROQ_API_KEY = st.secrets["api_keys"]["GROQ_API_KEY"]
 
 
 # Model selection
-model_options = ["llama3-70b-8192", "llama3-8b-8192","llama-3.2-1b-preview", "llama-3.2-3b-preview"]
+model_options = ["llama3-8b-8192", "llama3-70b-8192", "llama-3.2-1b-preview", "llama-3.2-3b-preview"]
 selected_model = st.sidebar.selectbox("Select a model", model_options)
 
 
