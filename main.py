@@ -1,18 +1,10 @@
 import streamlit as st
-#from langchain_voyageai import VoyageAIEmbeddings
 import os
-#import json
-#import boto3
 from dotenv import load_dotenv
-#from urllib.parse import urlparse
-#from pinecone import Pinecone
-#import pinecone
 from langchain_openai import ChatOpenAI
 import openai
 from groq import Groq
 from langchain.chains import LLMChain, RetrievalQA
-#import time
-#import re
 import warnings
 from langchain_pinecone import PineconeVectorStore
 from langchain.memory import ConversationBufferMemory
@@ -50,9 +42,6 @@ OPENAI_API_KEY = st.secrets["api_keys"]["OPENAI_API_KEY"]
 #Groq API KEY
 GROQ_API_KEY = st.secrets["api_keys"]["GROQ_API_KEY"]
 
-#For Heroku & Local deployment
-#OPENAI_API_KEY = os.getenv("My_OpenAI_API_key")
-#GROQ_API_KEY = os.getenv("My_Groq_API_key")
 
 # Model selection
 model_options = ["llama3-70b-8192", "llama3-8b-8192","llama-3.2-1b-preview", "llama-3.2-3b-preview"]
