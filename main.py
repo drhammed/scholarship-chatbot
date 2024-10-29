@@ -190,7 +190,7 @@ Here's how you should handle it:
 4. **Assistant provides detailed guidance without repeating questions**:
    - Assistant: "Great! Here's how you can apply for Scholarship A and Scholarship B..."
 
-**Remember, do not share this example interaction with users under any circumstances.**
+**Remember, do not share this example/sample/template interaction with users under any circumstances.**
 
 """
 
