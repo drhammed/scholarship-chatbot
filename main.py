@@ -46,30 +46,31 @@ load_dotenv()
 
 #For Streamlit & AWS
 #OpenAI API key
-#OPENAI_API_KEY = st.secrets["api_keys"]["OPENAI_API_KEY"]
+OPENAI_API_KEY = st.secrets["api_keys"]["OPENAI_API_KEY"]
 #Groq API KEY
-#GROQ_API_KEY = st.secrets["api_keys"]["GROQ_API_KEY"]
+GROQ_API_KEY = st.secrets["api_keys"]["GROQ_API_KEY"]
 
 #For Heroku & Local deployment
-OPENAI_API_KEY = os.getenv("My_OpenAI_API_key")
-GROQ_API_KEY = os.getenv("My_Groq_API_key")
+#OPENAI_API_KEY = os.getenv("My_OpenAI_API_key")
+#GROQ_API_KEY = os.getenv("My_Groq_API_key")
 
 # Model selection
-model_options = ["llama3-70b-8192", "llama3-8b-8192","gpt-4o", "gpt-4"]
+model_options = ["llama3-70b-8192", "llama3-8b-8192","llama-3.2-1b-preview", "llama-3.2-3b-preview"]
 selected_model = st.sidebar.selectbox("Select a model", model_options)
 
 # Initialize selected model
+
 def get_model(selected_model):
-    if selected_model == "llama3-70b-8192":
-        return ChatGroq(groq_api_key=GROQ_API_KEY, model="llama3-70b-8192", temperature=0.02, max_tokens=None, timeout=None, max_retries=2) 
-    elif selected_model == "llama3-8b-8192":
-        return ChatGroq(groq_api_key=GROQ_API_KEY, model="llama3-8b-8192", temperature=0.02, max_tokens=None, timeout=None, max_retries=2)
-    elif selected_model ==  "gpt-4o":
-        return ChatOpenAI(model="gpt-4o", temperature=0, max_tokens=None, timeout=None, max_retries=2, api_key=OPENAI_API_KEY)
-    elif selected_model == "gpt-4":
-        return ChatOpenAI(model="gpt-4", temperature=0, max_tokens=None, timeout=None, max_retries=2, api_key=OPENAI_API_KEY)
-    else:
-        raise ValueError("Invalid model selected")
+        if selected_model == "llama3-8b-8192":
+            return ChatGroq(groq_api_key=GROQ_API_KEY, model="llama3-8b-8192", temperature=0.02, max_tokens=None, timeout=None, max_retries=2)
+        elif selected_model == "llama3-70b-8192":
+            return ChatGroq(groq_api_key=GROQ_API_KEY, model="llama3-70b-8192", temperature=0.02, max_tokens=None, timeout=None, max_retries=2)
+        elif selected_model == "llama-3.2-1b-preview":
+            return ChatGroq(groq_api_key=GROQ_API_KEY, model="llama-3.2-1b-preview", temperature=0.02, max_tokens=None, timeout=None, max_retries=2)
+        elif selected_model == "llama-3.2-3b-preview":
+            return ChatGroq(groq_api_key=GROQ_API_KEY, model="llama-3.2-3b-preview", temperature=0.02, max_tokens=None, timeout=None, max_retries=2)
+        else:
+            raise ValueError("Invalid model selected")
 
 llm_mod = get_model(selected_model)
 
