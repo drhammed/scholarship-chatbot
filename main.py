@@ -83,7 +83,7 @@ def get_model(selected_model, stop_sequences: Union[List[str], str, None] = None
         "groq_api_key": GROQ_API_KEY,
         "temperature": 0.02,
         "max_tokens": None,
-        "timeout": None,
+        #"timeout": None,
         "max_retries": 2,
         "stop_sequences": stop_sequences
     }
