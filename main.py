@@ -82,10 +82,10 @@ def get_model(selected_model, stop_sequences: Union[List[str], str, None] = None
     common_params = {
         "groq_api_key": GROQ_API_KEY,
         "temperature": 0.02,
-        "max_tokens": None,
+        "max_completion_tokens": None,
         #"timeout": None,
-        "max_retries": 2,
-        "stop_sequences": stop_sequences
+        #"max_retries": 2,
+        "stop": stop_sequences
     }
 
     model_mapping = {
