@@ -37,7 +37,7 @@ load_dotenv()
 
 #For Streamlit & AWS
 #OpenAI API key
-OPENAI_API_KEY = st.secrets["api_keys"]["OPENAI_API_KEY"]
+#OPENAI_API_KEY = st.secrets["api_keys"]["OPENAI_API_KEY"]
 #Groq API KEY
 GROQ_API_KEY = st.secrets["api_keys"]["GROQ_API_KEY"]
 
@@ -80,7 +80,7 @@ def get_model(selected_model, stop_sequences: Union[List[str], str, None] = None
     logger.debug(f"Loading model: {selected_model} with stop_sequences: {stop_sequences}")
 
     common_params = {
-        "groq_api_key": GROQ_API_KEY,
+        "api_key": GROQ_API_KEY,
         "temperature": 0.02,
         "max_completion_tokens": None,
         #"timeout": None,
