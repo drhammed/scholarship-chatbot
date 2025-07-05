@@ -1,22 +1,26 @@
 import streamlit as st
 import os
+from dotenv import load_dotenv
 from scholarship_bot import ScholarshipBot, ConversationState
 import warnings
 
 # Ignore warnings
 warnings.filterwarnings("ignore")
 
+# Load environment variables
+load_dotenv()
+
 # Set page config
 st.set_page_config(
-    page_title="Scholarship Guidance System",
+    page_title="Scholarship Chatbot by drhammed",
     page_icon="🎓",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
 # Title and description
-st.title("🎓 Multi-Agent Scholarship Guidance System")
-st.markdown("Your AI-powered scholarship advisor that profiles you, searches for opportunities, and provides structured recommendations.")
+st.title("Scholarship Chatbot by drhammed")
+st.write("Hello! I'm your friendly chatbot. I'm here to help answer your questions regarding scholarships and funding for students, and provide information. I'm also super fast! Let's start!")
 
 # Sidebar for configuration
 with st.sidebar:
@@ -31,15 +35,22 @@ with st.sidebar:
     ]
     selected_model = st.selectbox("Select Model", model_options, index=0)
     
-    # API Keys (from secrets)
+    # API Keys (from secrets or environment)
     try:
         groq_api_key = st.secrets["api_keys"]["GROQ_API_KEY"]
         tavily_api_key = st.secrets["api_keys"]["TAVILY_API_KEY"]
         st.success("✅ API Keys Loaded")
     except Exception as e:
-        st.error("❌ API Keys Not Found in Secrets")
-        st.error("Please configure GROQ_API_KEY and TAVILY_API_KEY in Streamlit secrets")
-        st.stop()
+        # Try to get from environment variables (for development)
+        groq_api_key = os.getenv("GROQ_API_KEY")
+        tavily_api_key = os.getenv("TAVILY_API_KEY")
+        
+        if not groq_api_key or not tavily_api_key:
+            st.error("❌ API Keys Not Found")
+            st.error("Please configure GROQ_API_KEY and TAVILY_API_KEY in Streamlit secrets or environment variables")
+            st.stop()
+        else:
+            st.success("✅ API Keys Loaded from Environment")
     
     # Control buttons
     st.header("Controls")

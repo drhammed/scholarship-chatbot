@@ -1,6 +1,6 @@
 import os
 import json
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Optional
 from dataclasses import dataclass
 from enum import Enum
 
@@ -27,8 +27,8 @@ class UserProfile:
     location: str = ""
     citizenship: str = ""
     financial_need: str = ""
-    extracurriculars: List[str] = None
-    research_interests: List[str] = None
+    extracurriculars: Optional[List[str]] = None
+    research_interests: Optional[List[str]] = None
     career_goals: str = ""
     
     def __post_init__(self):
@@ -67,8 +67,8 @@ class ScholarshipBot:
         
         # Initialize clients
         self.groq_chat = ChatGroq(
-            groq_api_key=self.groq_api_key,
-            model_name=model_name,
+            api_key=self.groq_api_key,
+            model=model_name,
             temperature=0.02
         )
         self.tavily_client = TavilyClient(api_key=self.tavily_api_key)
@@ -131,7 +131,7 @@ class ScholarshipBot:
         
         return response
 
-    def research_agent(self, query: str) -> List[Dict[str, Any]]:
+    def research_agent(self, query: str) -> Dict[str, Any]:
         """Agent 2: Performs live web search using Tavily"""
         
         # Construct citizenship-specific search queries
@@ -155,8 +155,7 @@ class ScholarshipBot:
                 search_depth="advanced",
                 max_results=6,
                 include_answer=True,
-                include_raw_content=False,
-                include_domains=None
+                include_raw_content=False
             )
             
             # Secondary search for institution-specific scholarships
@@ -352,7 +351,7 @@ class ScholarshipBot:
         elif self.state == ConversationState.SEARCHING:
             try:
                 search_results = self.research_agent(user_input)
-                if "error" in search_results:
+                if isinstance(search_results, dict) and "error" in search_results:
                     return f"I encountered an error while searching: {search_results['error']}. Please try again."
                 
                 self.state = ConversationState.RESPONDING
