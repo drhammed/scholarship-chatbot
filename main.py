@@ -1,12 +1,8 @@
-import streamlit as st
 import os
 import json
 from typing import Dict, List, Any
 from dataclasses import dataclass
 from enum import Enum
-from datetime import datetime, timedelta
-import logging
-import warnings
 
 from langchain.chains import LLMChain
 from langchain_core.prompts import ChatPromptTemplate, HumanMessagePromptTemplate, MessagesPlaceholder
@@ -15,22 +11,13 @@ from langchain.chains.conversation.memory import ConversationBufferWindowMemory
 from langchain_groq import ChatGroq
 from tavily import TavilyClient
 
-# Ignore all warnings
-warnings.filterwarnings("ignore")
-
-# Set up Streamlit app
-st.set_page_config(page_title="AI-Powered Scholarship Chatbot by drhammed", layout="wide")
-st.title("🎓 AI-Powered Scholarship Chatbot by drhammed")
-st.write("Hello! I'm your intelligent scholarship advisor with live web search capabilities. I'll help you find personalized scholarships and guide you through the application process. Let's start!")
-
-# Initialize logger
-logger = logging.getLogger(__name__)
 
 class ConversationState(Enum):
     PROFILING = "profiling"
     SEARCHING = "searching"
     RESPONDING = "responding"
     COMPLETE = "complete"
+
 
 @dataclass
 class UserProfile:
@@ -66,23 +53,24 @@ class UserProfile:
         Career Goals: {self.career_goals}
         """
 
+
 class ScholarshipBot:
-    def __init__(self):
-        # Get API keys from Streamlit secrets
-        self.groq_api_key = st.secrets["api_keys"]["GROQ_API_KEY"]
-        self.tavily_api_key = st.secrets["api_keys"]["TAVILY_API_KEY"]
+    def __init__(self, groq_api_key: str, tavily_api_key: str, model_name: str = 'llama3-70b-8192'):
+        # Initialize APIs
+        self.groq_api_key = groq_api_key
+        self.tavily_api_key = tavily_api_key
         
         if not self.groq_api_key:
-            raise ValueError("GROQ_API_KEY is required in Streamlit secrets")
+            raise ValueError("GROQ_API_KEY is required")
         if not self.tavily_api_key:
-            raise ValueError("TAVILY_API_KEY is required in Streamlit secrets")
+            raise ValueError("TAVILY_API_KEY is required")
         
         # Initialize clients
         self.groq_chat = ChatGroq(
-            api_key=self.groq_api_key,  
-            model='llama3-70b-8192',   
+            groq_api_key=self.groq_api_key,
+            model_name=model_name,
             temperature=0.02
-            )
+        )
         self.tavily_client = TavilyClient(api_key=self.tavily_api_key)
         
         # Initialize conversation state
@@ -201,7 +189,7 @@ class ScholarshipBot:
             return all_results
             
         except Exception as e:
-            logger.error(f"Search error: {e}")
+            print(f"Search error: {e}")
             return {"error": str(e)}
 
     def response_agent(self, search_data: Dict[str, Any]) -> str:
@@ -305,55 +293,28 @@ class ScholarshipBot:
                 pass  # Continue without extraction if JSON parsing fails
                 
         except Exception as e:
-            logger.error(f"Profile extraction error: {e}")
-
-    def process_message(self, user_input: str) -> str:
-        """Main message processing orchestrator"""
-        
-        user_input_lower = user_input.strip().lower()
-        
-        # Handle confirmations
-        if self.pending_confirmation:
-            if user_input_lower in ['yes', 'y', 'ok', 'sure', 'confirm']:
-                if self.pending_confirmation == "application_support":
-                    self.pending_confirmation = None
-                    return self._provide_application_support()
-            elif user_input_lower in ['no', 'n', 'not now']:
-                self.pending_confirmation = None
-                return "No problem! Feel free to ask if you need anything else or want to search for different scholarships."
-        
-        # Route to appropriate agent based on current state
-        if self.state == ConversationState.PROFILING:
-            return self.profiler_agent(user_input)
-            
-        elif self.state == ConversationState.SEARCHING:
-            self.state = ConversationState.RESPONDING
-            search_results = self.research_agent(user_input)
-            if "error" in search_results:
-                return f"I encountered an error while searching: {search_results['error']}. Let me try to help based on general knowledge instead."
-            return self.response_agent(search_results)
-            
-        elif self.state == ConversationState.RESPONDING:
-            # Handle follow-up questions
-            return self._handle_followup(user_input)
-        
-        return "I'm not sure how to help with that. Could you please rephrase your question?"
+            print(f"Profile extraction error: {e}")
 
     def _provide_application_support(self) -> str:
-        """Provide detailed application support"""
+        """Provides detailed application support"""
         
         support_prompt = f"""
-        Provide detailed application support for a student with this profile:
+        Provide detailed application support for scholarships based on this user profile:
         {self.user_profile.to_search_context()}
         
-        Include:
-        1. **Personal Statement Template** - customized for their field
-        2. **Application Timeline** - step-by-step with deadlines
-        3. **Document Checklist** - everything they need to prepare
-        4. **Interview Preparation** - common questions and tips
-        5. **Follow-up Strategy** - how to track applications
+        And these search results:
+        {json.dumps(self.search_results, indent=2)}
         
-        Be specific and actionable.
+        Provide:
+        1. **Application Timeline** - When to start, key deadlines
+        2. **Document Preparation** - What documents are needed
+        3. **Personal Statement Tips** - Specific advice for their field/citizenship
+        4. **Recommendation Letters** - Who to ask and what to provide them
+        5. **Interview Preparation** - If applicable
+        6. **Common Mistakes to Avoid** - Specific to their profile
+        7. **Follow-up Actions** - What to do after applying
+        
+        Make it actionable and specific to their situation.
         """
         
         conversation = LLMChain(
@@ -364,168 +325,82 @@ class ScholarshipBot:
             verbose=False
         )
         
-        return conversation.predict(input="provide support")
+        response = conversation.predict(input="provide_support")
+        self.state = ConversationState.COMPLETE
+        
+        return response
 
-    def _handle_followup(self, user_input: str) -> str:
-        """Handle follow-up questions and requests"""
+    def process_message(self, user_input: str) -> str:
+        """Main message processing orchestrator"""
+        
+        user_input_lower = user_input.strip().lower()
+        
+        # Handle confirmations
+        if self.pending_confirmation:
+            if user_input_lower in ['yes', 'y', 'ok', 'sure']:
+                if self.pending_confirmation == "application_support":
+                    self.pending_confirmation = None
+                    return self._provide_application_support()
+            elif user_input_lower in ['no', 'n', 'not now']:
+                self.pending_confirmation = None
+                return "No problem! Feel free to ask if you need help with anything else regarding scholarships."
+        
+        # Route to appropriate agent based on state
+        if self.state == ConversationState.PROFILING:
+            return self.profiler_agent(user_input)
+        
+        elif self.state == ConversationState.SEARCHING:
+            try:
+                search_results = self.research_agent(user_input)
+                if "error" in search_results:
+                    return f"I encountered an error while searching: {search_results['error']}. Please try again."
+                
+                self.state = ConversationState.RESPONDING
+                return self.response_agent(search_results)
+                
+            except Exception as e:
+                return f"I encountered an error while searching for scholarships: {str(e)}. Please try again."
+        
+        elif self.state == ConversationState.RESPONDING:
+            # Handle additional questions or requests
+            return self._handle_followup_questions(user_input)
+        
+        elif self.state == ConversationState.COMPLETE:
+            return self._handle_followup_questions(user_input)
+        
+        return "I'm here to help you find scholarships! Let's start by getting to know your academic background."
+
+    def _handle_followup_questions(self, user_input: str) -> str:
+        """Handle follow-up questions after initial scholarship search"""
         
         followup_prompt = f"""
-        User profile: {self.user_profile.to_search_context()}
-        Previous search results available: {bool(self.search_results)}
+        The user has asked a follow-up question about scholarships: "{user_input}"
         
-        User follow-up: "{user_input}"
+        User Profile:
+        {self.user_profile.to_search_context()}
         
-        Provide helpful response based on context. If they want new search, set state back to searching.
-        If they want to modify their profile, help them update it.
+        Previous Search Results:
+        {json.dumps(self.search_results, indent=2)}
+        
+        Provide a helpful response. If they're asking for more specific information about a scholarship,
+        application process, or need additional guidance, provide detailed assistance.
+        If they want to search for different scholarships, indicate that you can help with that too.
         """
         
         conversation = LLMChain(
             llm=self.groq_chat,
             prompt=ChatPromptTemplate.from_messages([
-                SystemMessage(content=followup_prompt),
-                MessagesPlaceholder(variable_name="chat_history"),
-                HumanMessagePromptTemplate.from_template("{human_input}")
+                SystemMessage(content=followup_prompt)
             ]),
-            verbose=False,
-            memory=self.memory
+            verbose=False
         )
         
-        return conversation.predict(human_input=user_input)
+        return conversation.predict(input="followup")
 
-# Function to get today's date in a readable format
-def get_readable_date():
-    return datetime.now().strftime("%Y-%m-%d")
-
-# Function to generate a summary of the user's first query
-def generate_summary(user_input, bot):
-    summary_prompt = f"Summarize this query in a few words: {user_input}"
-    summary_response = bot.groq_chat.predict(summary_prompt)
-    return summary_response.strip()
-
-# Function to generate a unique session name based on the summary of the user's first query
-def generate_session_name(user_input, bot):
-    summary = generate_summary(user_input, bot)
-    return summary
-
-# Function to save the current session
-def save_current_session():
-    if st.session_state['current_session_name'] and len(st.session_state['messages']) > 1:
-        st.session_state['sessions'][st.session_state['current_session_name']] = {
-            'date': get_readable_date(),
-            'messages': st.session_state['messages'].copy(),
-            'bot_state': {
-                'state': st.session_state['bot'].state.value,
-                'user_profile': st.session_state['bot'].user_profile.__dict__,
-                'pending_confirmation': st.session_state['bot'].pending_confirmation
-            }
-        }
-
-# Function to display chat sessions in the sidebar
-def display_chat_sessions():
-    st.sidebar.header("Chat History")
-    today = get_readable_date()
-    yesterday = (datetime.now() - timedelta(1)).strftime("%Y-%m-%d")
-    sessions = sorted(st.session_state['sessions'].items(), key=lambda x: x[1]['date'], reverse=True)
-    
-    current_day = ""
-    for session_name, session_info in sessions:
-        session_day = session_info['date']
-        if session_day != current_day:
-            if session_day == today:
-                st.sidebar.subheader("Today")
-            elif session_day == yesterday:
-                st.sidebar.subheader("Yesterday")
-            else:
-                st.sidebar.subheader(session_day)
-            current_day = session_day
-        if st.sidebar.button(session_name):
-            st.session_state['messages'] = session_info['messages']
-            # Restore bot state if available
-            if 'bot_state' in session_info:
-                bot_state = session_info['bot_state']
-                st.session_state['bot'].state = ConversationState(bot_state['state'])
-                # Restore user profile
-                for key, value in bot_state['user_profile'].items():
-                    setattr(st.session_state['bot'].user_profile, key, value)
-                st.session_state['bot'].pending_confirmation = bot_state['pending_confirmation']
-
-# Initialize session state
-if 'messages' not in st.session_state:
-    st.session_state['messages'] = []
-
-if 'sessions' not in st.session_state:
-    st.session_state['sessions'] = {}
-
-if 'current_session_name' not in st.session_state:
-    st.session_state['current_session_name'] = None
-
-if 'bot' not in st.session_state:
-    try:
-        st.session_state['bot'] = ScholarshipBot()
-    except ValueError as e:
-        st.error(f"Configuration Error: {e}")
-        st.error("Please make sure GROQ_API_KEY and TAVILY_API_KEY are set in your Streamlit secrets.")
-        st.stop()
-
-# Display saved chat sessions in the sidebar
-display_chat_sessions()
-
-# Add a sidebar section for user profile status
-if st.session_state['bot'].user_profile:
-    st.sidebar.header("Your Profile")
-    profile = st.session_state['bot'].user_profile
-    if profile.field_of_study:
-        st.sidebar.write(f"**Field:** {profile.field_of_study}")
-    if profile.education_level:
-        st.sidebar.write(f"**Level:** {profile.education_level}")
-    if profile.citizenship:
-        st.sidebar.write(f"**Citizenship:** {profile.citizenship}")
-    if profile.location:
-        st.sidebar.write(f"**Location:** {profile.location}")
-    
-    # Show completion status
-    if profile.is_complete():
-        st.sidebar.success("✅ Profile Complete")
-    else:
-        st.sidebar.warning("⚠️ Profile Incomplete")
-
-# Display chat messages from history
-for message in st.session_state['messages']:
-    with st.chat_message(message['role']):
-        st.markdown(message['content'])
-
-# Chat input
-user_question = st.chat_input("Ask me about scholarships...")
-
-if user_question:
-    # Set session name based on the summary of the first user input
-    if st.session_state.current_session_name is None:
-        st.session_state.current_session_name = generate_session_name(user_question, st.session_state['bot'])
-    
-    # Add user message to chat history
-    st.session_state["messages"].append({"role": "user", "content": user_question})
-    
-    # Display user message
-    with st.chat_message("user"):
-        st.markdown(user_question)
-    
-    # Process message with bot
-    with st.spinner("Thinking and searching..."):
-        try:
-            response = st.session_state['bot'].process_message(user_question)
-        except Exception as e:
-            st.error(f"An error occurred: {str(e)}")
-            response = "Sorry, I'm having trouble processing your request right now. Please try again later."
-    
-    # Add bot response to chat history
-    st.session_state['messages'].append({"role": "assistant", "content": response})
-    
-    # Display bot response
-    with st.chat_message("assistant"):
-        st.markdown(response)
-    
-    # Save the current session automatically
-    save_current_session()
-    
-    # Rerun to update the sidebar profile display
-    st.rerun()
+    def reset_conversation(self):
+        """Reset the conversation state"""
+        self.state = ConversationState.PROFILING
+        self.user_profile = UserProfile()
+        self.search_results = []
+        self.pending_confirmation = None
+        self.memory.clear()
