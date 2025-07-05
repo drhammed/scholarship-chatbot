@@ -1,280 +1,423 @@
 import streamlit as st
 import os
-from dotenv import load_dotenv
-from groq import Groq
-from langchain.chains import LLMChain, RetrievalQA
+import json
+from typing import Dict, List, Any
+from dataclasses import dataclass
+from enum import Enum
+from datetime import datetime, timedelta
+import logging
 import warnings
-from langchain.memory import ConversationBufferMemory
-from langchain.schema import HumanMessage
-from langchain.chains import ConversationChain
-from langchain_core.output_parsers import StrOutputParser
-from langchain_core.runnables import RunnablePassthrough
-from langchain_core.runnables.base import Runnable
-from langchain_core.prompts import (
-    ChatPromptTemplate,
-    HumanMessagePromptTemplate,
-    MessagesPlaceholder,
-)
+
+from langchain.chains import LLMChain
+from langchain_core.prompts import ChatPromptTemplate, HumanMessagePromptTemplate, MessagesPlaceholder
 from langchain_core.messages import SystemMessage
 from langchain.chains.conversation.memory import ConversationBufferWindowMemory
 from langchain_groq import ChatGroq
-import uuid
-from datetime import datetime, timedelta
-import logging
-from typing import List, Union
+from tavily import TavilyClient
 
 # Ignore all warnings
 warnings.filterwarnings("ignore")
 
 # Set up Streamlit app
-st.set_page_config(page_title="Scholarship Chatbot by drhammed", layout="wide")
-st.title("Scholarship Chatbot by drhammed")
-st.write("Hello! I'm your friendly chatbot. I'm here to help answer your questions regarding scholarships and funding for students, and provide information. I'm also super fast! Let's start!")
-
-# Load environment variables from .env file
-load_dotenv()
-
-
-#For Streamlit & AWS
-#OpenAI API key
-#OPENAI_API_KEY = st.secrets["api_keys"]["OPENAI_API_KEY"]
-#Groq API KEY
-GROQ_API_KEY = st.secrets["api_keys"]["GROQ_API_KEY"]
-
-
-# Model selection
-model_options = ["llama3-8b-8192", "llama3-70b-8192", "llama-3.2-1b-preview", "llama-3.2-3b-preview"]
-selected_model = st.sidebar.selectbox("Select a model", model_options)
-
-
+st.set_page_config(page_title="AI-Powered Scholarship Chatbot by drhammed", layout="wide")
+st.title("🎓 AI-Powered Scholarship Chatbot by drhammed")
+st.write("Hello! I'm your intelligent scholarship advisor with live web search capabilities. I'll help you find personalized scholarships and guide you through the application process. Let's start!")
 
 # Initialize logger
 logger = logging.getLogger(__name__)
 
-def get_model(selected_model, stop_sequences: Union[List[str], str, None] = None) -> ChatGroq:
-    """
-    Returns a ChatGroq model instance based on the selected model name.
+class ConversationState(Enum):
+    PROFILING = "profiling"
+    SEARCHING = "searching"
+    RESPONDING = "responding"
+    COMPLETE = "complete"
 
-    Args:
-        selected_model (str): The identifier for the desired model.
-        stop_sequences (List[str] | str | None, optional): Sequences where the model should stop generating further tokens. Defaults to None.
-
-    Returns:
-        ChatGroq: An instance of the ChatGroq model configured with the specified parameters.
-
-    Raises:
-        ValueError: If an invalid model is selected.
-        TypeError: If stop_sequences is not a list of strings, a string, or None.
-        EnvironmentError: If GROQ_API_KEY is not set.
-    """
-    if not GROQ_API_KEY:
-        raise EnvironmentError("GROQ_API_KEY is not set")
-
-    if stop_sequences is None:
-        stop_sequences = []
-    elif isinstance(stop_sequences, str):
-        stop_sequences = [stop_sequences]
-    elif not isinstance(stop_sequences, list) or not all(isinstance(s, str) for s in stop_sequences):
-        raise TypeError("stop_sequences must be a list of strings, a string, or None")
+@dataclass
+class UserProfile:
+    field_of_study: str = ""
+    education_level: str = ""
+    gpa: float = 0.0
+    location: str = ""
+    citizenship: str = ""
+    financial_need: str = ""
+    extracurriculars: List[str] = None
+    research_interests: List[str] = None
+    career_goals: str = ""
     
-    logger.debug(f"Loading model: {selected_model} with stop_sequences: {stop_sequences}")
+    def __post_init__(self):
+        if self.extracurriculars is None:
+            self.extracurriculars = []
+        if self.research_interests is None:
+            self.research_interests = []
+    
+    def is_complete(self) -> bool:
+        required_fields = [self.field_of_study, self.education_level, self.location, self.citizenship]
+        return all(field.strip() for field in required_fields)
+    
+    def to_search_context(self) -> str:
+        return f"""
+        Field of Study: {self.field_of_study}
+        Education Level: {self.education_level}
+        Location: {self.location}
+        Citizenship: {self.citizenship}
+        GPA: {self.gpa if self.gpa > 0 else 'Not specified'}
+        Financial Need: {self.financial_need}
+        Research Interests: {', '.join(self.research_interests) if self.research_interests else 'Not specified'}
+        Career Goals: {self.career_goals}
+        """
 
-    common_params = {
-        "api_key": GROQ_API_KEY,
-        "temperature": 0.02,
-        "max_completion_tokens": None,
-        #"timeout": None,
-        #"max_retries": 2,
-        "stop": stop_sequences
-    }
-
-    model_mapping = {
-        "llama3-8b-8192": "llama3-8b-8192",
-        "llama3-70b-8192": "llama3-70b-8192",
-        "llama-3.2-1b-preview": "llama-3.2-1b-preview",
-        "llama-3.2-3b-preview": "llama-3.2-3b-preview",
-    }
-
-    if selected_model in model_mapping:
-        return ChatGroq(
-            model=model_mapping[selected_model],
-            **common_params
+class ScholarshipBot:
+    def __init__(self):
+        # Get API keys from Streamlit secrets
+        self.groq_api_key = st.secrets["api_keys"]["GROQ_API_KEY"]
+        self.tavily_api_key = st.secrets["api_keys"]["TAVILY_API_KEY"]
+        
+        if not self.groq_api_key:
+            raise ValueError("GROQ_API_KEY is required in Streamlit secrets")
+        if not self.tavily_api_key:
+            raise ValueError("TAVILY_API_KEY is required in Streamlit secrets")
+        
+        # Initialize clients
+        self.groq_chat = ChatGroq(
+            groq_api_key=self.groq_api_key,
+            model_name='llama3-70b-8192',
+            temperature=0.02
         )
-    else:
-        logger.error(f"Invalid model selected: {selected_model}")
-        raise ValueError("Invalid model selected")
+        self.tavily_client = TavilyClient(api_key=self.tavily_api_key)
+        
+        # Initialize conversation state
+        self.state = ConversationState.PROFILING
+        self.user_profile = UserProfile()
+        self.search_results = []
+        self.pending_confirmation = None
+        
+        # Initialize memory
+        self.memory = ConversationBufferWindowMemory(
+            k=10,
+            memory_key="chat_history",
+            return_messages=True
+        )
 
+    def profiler_agent(self, user_input: str) -> str:
+        """Agent 1: Profiles the user and extracts relevant information"""
+        
+        system_prompt = f"""
+        You are a Profiler Agent for a scholarship guidance system. Your job is to gather complete user information.
+        
+        Current user profile:
+        {self.user_profile.to_search_context()}
+        
+        IMPORTANT RULES:
+        1. Ask ONE question at a time to gather missing information
+        2. Extract and update profile information from user responses
+        3. Required fields: field_of_study, education_level, location, citizenship
+        4. Optional but helpful: GPA, financial_need, research_interests, career_goals, extracurriculars
+        5. Be conversational and friendly
+        6. When asking about citizenship, clarify: "What is your citizenship/nationality? This is crucial as scholarships have specific eligibility requirements based on citizenship."
+        7. Once you have the required information, say "PROFILE_COMPLETE" to proceed to search
+        
+        Focus on gathering the most important missing information first. Emphasize that citizenship information is critical for finding eligible scholarships.
+        """
+        
+        prompt = ChatPromptTemplate.from_messages([
+            SystemMessage(content=system_prompt),
+            MessagesPlaceholder(variable_name="chat_history"),
+            HumanMessagePromptTemplate.from_template("{human_input}")
+        ])
+        
+        conversation = LLMChain(
+            llm=self.groq_chat,
+            prompt=prompt,
+            verbose=False,
+            memory=self.memory
+        )
+        
+        response = conversation.predict(human_input=user_input)
+        
+        # Extract information from user input
+        self._extract_profile_info(user_input)
+        
+        if "PROFILE_COMPLETE" in response or self.user_profile.is_complete():
+            self.state = ConversationState.SEARCHING
+            return f"{response}\n\nGreat! I have enough information. Let me search for relevant scholarships for you..."
+        
+        return response
 
-llm_mod = get_model(selected_model)
+    def research_agent(self, query: str) -> List[Dict[str, Any]]:
+        """Agent 2: Performs live web search using Tavily"""
+        
+        # Construct citizenship-specific search queries
+        citizenship_query = f"""
+        scholarships grants funding for {self.user_profile.citizenship} citizens 
+        {self.user_profile.field_of_study} {self.user_profile.education_level} 
+        international students 2024 2025
+        """
+        
+        # Also search for location-specific opportunities
+        location_query = f"""
+        scholarships {self.user_profile.location} university 
+        {self.user_profile.field_of_study} {self.user_profile.education_level}
+        {self.user_profile.citizenship} international students
+        """
+        
+        try:
+            # Primary search focused on citizenship eligibility
+            citizenship_results = self.tavily_client.search(
+                query=citizenship_query,
+                search_depth="advanced",
+                max_results=6,
+                include_answer=True,
+                include_raw_content=False,
+                include_domains=None
+            )
+            
+            # Secondary search for institution-specific scholarships
+            location_results = self.tavily_client.search(
+                query=location_query,
+                search_depth="advanced", 
+                max_results=4,
+                include_answer=True,
+                include_raw_content=False
+            )
+            
+            # Search for application tips
+            tips_query = f"scholarship application tips {self.user_profile.field_of_study} personal statement {self.user_profile.citizenship}"
+            tips_results = self.tavily_client.search(
+                query=tips_query,
+                search_depth="basic",
+                max_results=3,
+                include_answer=True
+            )
+            
+            # Combine results with source tracking
+            all_results = {
+                'citizenship_scholarships': citizenship_results,
+                'location_scholarships': location_results,
+                'application_tips': tips_results,
+                'user_profile': self.user_profile.to_search_context()
+            }
+            
+            self.search_results = all_results
+            return all_results
+            
+        except Exception as e:
+            logger.error(f"Search error: {e}")
+            return {"error": str(e)}
 
+    def response_agent(self, search_data: Dict[str, Any]) -> str:
+        """Agent 3: Synthesizes search results and provides structured response"""
+        
+        system_prompt = """
+        You are a Response Agent for a scholarship guidance system. Your job is to synthesize search results 
+        and provide comprehensive, actionable scholarship guidance.
+        
+        CRITICAL REQUIREMENTS:
+        1. **CITIZENSHIP ELIGIBILITY FIRST**: Only recommend scholarships that explicitly allow the user's citizenship/nationality
+        2. **SOURCE ATTRIBUTION**: Always include the source URL for each scholarship mentioned using format: [Source: URL]
+        3. **VERIFICATION NOTE**: Always remind users to verify eligibility on the official website
+        
+        RESPONSE STRUCTURE:
+        1. **🎯 Scholarships for [User's Citizenship] Citizens** (3-5 scholarships they can actually apply for)
+        2. **📋 Application Guidance** (specific tips for their profile and citizenship)
+        3. **⏰ Next Steps** (concrete action items with deadlines)
+        4. **🔗 Additional Resources** (relevant links with sources)
+        
+        FORMATTING RULES:
+        - Each scholarship must include: Name, Amount (if available), Deadline, Eligibility, Application process
+        - Include source URL for each scholarship: [Source: website.com]
+        - Use clear headers and bullet points
+        - Emphasize citizenship-specific eligibility criteria
+        - Always ask for confirmation before proceeding with detailed application support
+        
+        AVOID:
+        - Recommending scholarships limited to US citizens unless user is from US
+        - Generic advice without considering user's specific citizenship
+        - Scholarships without clear source attribution
+        """
+        
+        search_context = json.dumps(search_data, indent=2)
+        
+        prompt = ChatPromptTemplate.from_messages([
+            SystemMessage(content=system_prompt),
+            HumanMessagePromptTemplate.from_template(
+                "Based on this search data and user profile, provide comprehensive scholarship guidance:\n\n{search_context}"
+            )
+        ])
+        
+        conversation = LLMChain(
+            llm=self.groq_chat,
+            prompt=prompt,
+            verbose=False
+        )
+        
+        response = conversation.predict(search_context=search_context)
+        
+        # Set up confirmation for next steps
+        self.pending_confirmation = "application_support"
+        
+        return response + "\n\n" + "Would you like me to provide detailed application support for any of these scholarships? (Yes/No)"
 
-system_prompt = """
-Your primary tasks involve providing scholarship and funding information for users. Follow these steps for each task:
+    def _extract_profile_info(self, user_input: str):
+        """Extract profile information from user input using LLM"""
+        
+        extraction_prompt = f"""
+        Extract profile information from this user input: "{user_input}"
+        
+        Current profile: {self.user_profile.to_search_context()}
+        
+        Return ONLY a JSON object with any new information found. Use these exact keys:
+        - field_of_study
+        - education_level  
+        - gpa
+        - location
+        - citizenship
+        - financial_need
+        - research_interests (array)
+        - career_goals
+        - extracurriculars (array)
+        
+        If no new information is found, return empty JSON {{}}.
+        """
+        
+        try:
+            conversation = LLMChain(
+                llm=self.groq_chat,
+                prompt=ChatPromptTemplate.from_messages([
+                    SystemMessage(content=extraction_prompt)
+                ]),
+                verbose=False
+            )
+            
+            result = conversation.predict(input="extract")
+            
+            # Try to parse JSON and update profile
+            try:
+                extracted_data = json.loads(result.strip())
+                for key, value in extracted_data.items():
+                    if hasattr(self.user_profile, key) and value:
+                        if isinstance(value, list):
+                            current_list = getattr(self.user_profile, key) or []
+                            updated_list = list(set(current_list + value))
+                            setattr(self.user_profile, key, updated_list)
+                        else:
+                            setattr(self.user_profile, key, value)
+            except json.JSONDecodeError:
+                pass  # Continue without extraction if JSON parsing fails
+                
+        except Exception as e:
+            logger.error(f"Profile extraction error: {e}")
 
-1. **Scholarship Identification**:
-- **If the user has not provided their field of study, level of education, and other relevant details**, ask for it.
-- **If the user has already provided this information**, proceed to identify suitable scholarships and funding opportunities.
-- Use the information from the conversation history to identify suitable scholarships.
-- Provide detailed information about each identified scholarship, including eligibility criteria, application process, deadlines, and any other relevant details.
+    def process_message(self, user_input: str) -> str:
+        """Main message processing orchestrator"""
+        
+        user_input_lower = user_input.strip().lower()
+        
+        # Handle confirmations
+        if self.pending_confirmation:
+            if user_input_lower in ['yes', 'y', 'ok', 'sure', 'confirm']:
+                if self.pending_confirmation == "application_support":
+                    self.pending_confirmation = None
+                    return self._provide_application_support()
+            elif user_input_lower in ['no', 'n', 'not now']:
+                self.pending_confirmation = None
+                return "No problem! Feel free to ask if you need anything else or want to search for different scholarships."
+        
+        # Route to appropriate agent based on current state
+        if self.state == ConversationState.PROFILING:
+            return self.profiler_agent(user_input)
+            
+        elif self.state == ConversationState.SEARCHING:
+            self.state = ConversationState.RESPONDING
+            search_results = self.research_agent(user_input)
+            if "error" in search_results:
+                return f"I encountered an error while searching: {search_results['error']}. Let me try to help based on general knowledge instead."
+            return self.response_agent(search_results)
+            
+        elif self.state == ConversationState.RESPONDING:
+            # Handle follow-up questions
+            return self._handle_followup(user_input)
+        
+        return "I'm not sure how to help with that. Could you please rephrase your question?"
 
-2. **Data Validation**:
-- Verify that the information provided by the user is accurate and complete.
-- Confirm that the list of scholarships or funding opportunities is relevant and matches the user's profile.
+    def _provide_application_support(self) -> str:
+        """Provide detailed application support"""
+        
+        support_prompt = f"""
+        Provide detailed application support for a student with this profile:
+        {self.user_profile.to_search_context()}
+        
+        Include:
+        1. **Personal Statement Template** - customized for their field
+        2. **Application Timeline** - step-by-step with deadlines
+        3. **Document Checklist** - everything they need to prepare
+        4. **Interview Preparation** - common questions and tips
+        5. **Follow-up Strategy** - how to track applications
+        
+        Be specific and actionable.
+        """
+        
+        conversation = LLMChain(
+            llm=self.groq_chat,
+            prompt=ChatPromptTemplate.from_messages([
+                SystemMessage(content=support_prompt)
+            ]),
+            verbose=False
+        )
+        
+        return conversation.predict(input="provide support")
 
-3. **Funding Guidance**:
-- Offer guidance on how to apply for scholarships and funding.
-- Provide tips on writing personal statements, gathering recommendation letters, and preparing for interviews if applicable.
-- Share information on other financial aid options, such as grants, fellowships, and student loans.
-
-4. **Summary Confirmation**:
-- Display a summary of the identified scholarships and funding opportunities that you identified from the step 2 above.
-- Require user confirmation to proceed with detailed guidance or application support.
-
-5. **Application Support**:
-- Following user confirmation, continue the conversation and offer support for the remaining part of the application process.
-- This include Proceeding with detailed guidance, like how to apply, deadline of the scholarships, tips for writing statement of purpose/motivational statement" and if needed by the scholarship, how to contact a Professor.
-- Don't go back to the beginning. Ask the user if they want info on how to apply and then proceed to the next step here
-- Provide templates or examples for personal statements, resumes, and other required documents.
-- Assist in organizing and tracking application deadlines and requirements.
-
-6. **Completion**:
-- Upon successful identification and application support, provide a confirmation to the user, including next steps and follow-up actions.
-
-7. **Action Confirmation**:
-- Before providing detailed application support, make sure to show the summary of data and steps going to be submitted.
-
-8. **Off-topic Handling**:
-- If the user asks a question that is not related to scholarships, funding, funding fellowships, and other academics disucssion (except greetings and compliments for you), respond with: 
-    "Sorry, but i'm here to assist you with scholarship, funding and related information. If you have any questions related to these topics, please feel free to ask!"
-
-9. **Academic Inquiry**:
-- If the user asks for information, links, or websites related to universities, graduate schools, scholarship agencies, or research organizations, and it is relevant to scholarships, funding, or educational purposes, provide the link or information.
-- Example: If the user asks "What's the website of McGill University?", respond with: 
-    "The website for McGill University is www.mcgill.ca. If you have any questions related to scholarships, funding, or educational information about McGill University, please feel free to ask!"
-- Example: If the user asks "What is the website of NASA?", respond with: 
-    "The website for NASA is www.nasa.gov. If you have any questions related to scholarships, funding, or educational information about NASA, please feel free to ask!"
-- Example: If the user asks "What is the website of USGS?", respond with: 
-    "The website for the United States Geological Survey (USGS) is www.usgs.gov. If you have any questions related to scholarships, funding, or educational information about USGS, please feel free to ask!"
-- If the request is not related to universities, graduate schools, scholarships funding, research organizations, or educational purposes, respond with:
-    "Sorry, but I can only assist with scholarship, and educational-related information. If you have any questions related to these topics, please feel free to ask!"
-- Example: If the user asks "What is the website of IRCC?" or any Governmental Agencies (not related to scholarships), respond with:
-    "Sorry, but I can only assist with scholarship, and educational-related information. If you have any questions related to these topics, please feel free to ask!"
-
-10. **Capability Handling**:
-- If the user asks a question about your capability,importance or functions or what you are trained for, and other of your usefulness disucssion (except greetings and compliments for you), respond with: 
-    "Sorry, I was trained to assist with scholarship, funding and related information. If you have any questions related to these topics, please feel free to ask!"
-
-11. **Capability Confirmation**:
-- If the user wanted to confirm whether you're trained specifically for scholarships (e.g., So, does that mean you're trained only for scholerships?) or other confirmation related to your capability and usefulness discussion (except greetings and compliments for you), respond with: 
-    "Yes, I was trained to assist with only scholarships and educational related content. If you have any questions related to these topics, please feel free to ask!"
-
-12. **Handling Requests for Samples, Examples, or Templates**:
-    - **Important**: Do not provide the **Example interaction** under any circumstances.
-    - If the user asks for a "sample", "example", or "template" **without mentioning scholarships or funding**, do not provide the Example interaction.
-    - Example:
-      - If the user asks "Can you provide me with an example", "Can you provide me with a sample", or "Can you provide me with a template", reply with:
-        "Sorry, but I'm not sure which sample, example, or template you mean. If you're referring to specific scholarship information or documents, please let me know, and I'll be happy to assist."
-    - If the user requests a sample or template related to scholarships (e.g., "Can you provide a template for a personal statement?"), provide the appropriate assistance without sharing the Example interaction.
-
-**General Guidelines**:
-
-- **At each step, do not ask the user for information they have already provided. Use the information from the conversation history to proceed.**
-
-- **Do not share the Example interaction with the user under any circumstances, even if they ask for a "sample", "example", or "template" of anything.**
-
-
- 
-You must follow this rule for handling multiple function calls in a single message:
-
-1. For any "create" function (e.g., creating an application profile, creating a list of scholarships), you must first summarize the data and present it to the user for confirmation.
-2. Only after the user confirms the correctness of the data should you proceed to submit the function call.
-
-Here's how you should handle it:
-• Summarize the data in a clear and concise manner.
-• Ask the user for confirmation with a clear question, e.g., "Do you confirm the above data? (Yes/No)"
-• If the user confirms, proceed to make the function call.
-• If the user does not confirm or requests changes, modify the data as per the user's instructions and present it again for confirmation.
-. If the user already confirmed (including if there first messages is detailed enough that they're looking for scholarships and they already shared their profile with you), continue the conversation and proceed with detailed guidance, like how to apply, deadline of the scholarships, tips for writing statement of purpose/motivational statement" and if needed by the scholarship, how to contact a Professor
-. Continues the conversation until you provide ALL the needed assistance to make a solid scholarship application or till the user is satisfied and end the chat.
-
-Example interation- This Example interaction is for you ONLY- On NO condition should you provide it as a response for the bot if they ask you for "example", "sample" or "template" of anything!!!:
-Again, don't provide this example interaction as a response for ANY USER when they ask for "sample", "example", "template" of ANYTHING!!!
-1. User requests information on scholarships for a master's program in computer science.
-2. Assistant asks for details about the user's profile and preferences.
-
-
-Assistant: "I can help you find scholarships for a master's program in computer science. Could you please provide more details about your academic background, any relevant work experience, and specific areas of interest within computer science?"
-
-User: [provides details]
-
-Assistant: "Based on the information provided, I have identified the following scholarships that you might be eligible for (then proceed with the scholarships you've identified):
-- Scholarship A: Eligibility criteria, application process, deadlines
-- Scholarship B: Eligibility criteria, application process, deadlines
-
-Do you confirm the above data and want to proceed with more detailed guidance on these scholarships? (Yes/No)"
-
-User: "Yes" or "Yes, confirme" or "Yes, I confirmed" or "Confirm"
-
-Assistant: "Proceeding with detailed guidance, like how to apply, deadline of the scholarships, tips for writing statement of purpose/motivational statement" and if needed by the scholarship, how to contact a Professor"
-
-If the user responds with "Yes," Proceed with detailed guidance, like how to apply, deadline of the scholarships, tips for writing statement of purpose/motivational statement" and if needed by the scholarship, how to contact a Professor. If the user responds with "No" or requests changes at any step, update the data and seek confirmation again.
-
-Ensure the conversation continues until you provide the needed assistance to make a solid scholarship application or till the user is satisfied and end the chat.
-
-"""
-
-
-
-
-# Initialize the conversation memory
-#conversational_memory_length = 100
-#memory = ConversationBufferWindowMemory(k=conversational_memory_length, memory_key="chat_history", return_messages=True)
-
-memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
-
-
-# Initialize chat history
-if 'messages' not in st.session_state:
-    st.session_state['messages'] = []
-
-if 'chat_history' not in st.session_state:
-    st.session_state['chat_history'] = []
-
-if 'sessions' not in st.session_state:
-    st.session_state['sessions'] = {}
-
-if 'current_session_name' not in st.session_state:
-    st.session_state['current_session_name'] = None
-
-if 'user_input' not in st.session_state:
-    st.session_state['user_input'] = ''
-
-if 'conversation_state' not in st.session_state:
-    st.session_state['conversation_state'] = "start"
-
+    def _handle_followup(self, user_input: str) -> str:
+        """Handle follow-up questions and requests"""
+        
+        followup_prompt = f"""
+        User profile: {self.user_profile.to_search_context()}
+        Previous search results available: {bool(self.search_results)}
+        
+        User follow-up: "{user_input}"
+        
+        Provide helpful response based on context. If they want new search, set state back to searching.
+        If they want to modify their profile, help them update it.
+        """
+        
+        conversation = LLMChain(
+            llm=self.groq_chat,
+            prompt=ChatPromptTemplate.from_messages([
+                SystemMessage(content=followup_prompt),
+                MessagesPlaceholder(variable_name="chat_history"),
+                HumanMessagePromptTemplate.from_template("{human_input}")
+            ]),
+            verbose=False,
+            memory=self.memory
+        )
+        
+        return conversation.predict(human_input=user_input)
 
 # Function to get today's date in a readable format
 def get_readable_date():
     return datetime.now().strftime("%Y-%m-%d")
 
 # Function to generate a summary of the user's first query
-def generate_summary(user_input):
+def generate_summary(user_input, bot):
     summary_prompt = f"Summarize this query in a few words: {user_input}"
-    summary_response = llm_mod.predict(summary_prompt)
+    summary_response = bot.groq_chat.predict(summary_prompt)
     return summary_response.strip()
 
 # Function to generate a unique session name based on the summary of the user's first query
-def generate_session_name(user_input):
-    summary = generate_summary(user_input)
+def generate_session_name(user_input, bot):
+    summary = generate_summary(user_input, bot)
     return summary
-
 
 # Function to save the current session
 def save_current_session():
     if st.session_state['current_session_name'] and len(st.session_state['messages']) > 1:
         st.session_state['sessions'][st.session_state['current_session_name']] = {
             'date': get_readable_date(),
-            'messages': st.session_state['messages'].copy()
+            'messages': st.session_state['messages'].copy(),
+            'bot_state': {
+                'state': st.session_state['bot'].state.value,
+                'user_profile': st.session_state['bot'].user_profile.__dict__,
+                'pending_confirmation': st.session_state['bot'].pending_confirmation
+            }
         }
 
 # Function to display chat sessions in the sidebar
@@ -297,106 +440,92 @@ def display_chat_sessions():
             current_day = session_day
         if st.sidebar.button(session_name):
             st.session_state['messages'] = session_info['messages']
+            # Restore bot state if available
+            if 'bot_state' in session_info:
+                bot_state = session_info['bot_state']
+                st.session_state['bot'].state = ConversationState(bot_state['state'])
+                # Restore user profile
+                for key, value in bot_state['user_profile'].items():
+                    setattr(st.session_state['bot'].user_profile, key, value)
+                st.session_state['bot'].pending_confirmation = bot_state['pending_confirmation']
+
+# Initialize session state
+if 'messages' not in st.session_state:
+    st.session_state['messages'] = []
+
+if 'sessions' not in st.session_state:
+    st.session_state['sessions'] = {}
+
+if 'current_session_name' not in st.session_state:
+    st.session_state['current_session_name'] = None
+
+if 'bot' not in st.session_state:
+    try:
+        st.session_state['bot'] = ScholarshipBot()
+    except ValueError as e:
+        st.error(f"Configuration Error: {e}")
+        st.error("Please make sure GROQ_API_KEY and TAVILY_API_KEY are set in your Streamlit secrets.")
+        st.stop()
 
 # Display saved chat sessions in the sidebar
 display_chat_sessions()
 
+# Add a sidebar section for user profile status
+if st.session_state['bot'].user_profile:
+    st.sidebar.header("Your Profile")
+    profile = st.session_state['bot'].user_profile
+    if profile.field_of_study:
+        st.sidebar.write(f"**Field:** {profile.field_of_study}")
+    if profile.education_level:
+        st.sidebar.write(f"**Level:** {profile.education_level}")
+    if profile.citizenship:
+        st.sidebar.write(f"**Citizenship:** {profile.citizenship}")
+    if profile.location:
+        st.sidebar.write(f"**Location:** {profile.location}")
+    
+    # Show completion status
+    if profile.is_complete():
+        st.sidebar.success("✅ Profile Complete")
+    else:
+        st.sidebar.warning("⚠️ Profile Incomplete")
 
 # Display chat messages from history
 for message in st.session_state['messages']:
     with st.chat_message(message['role']):
         st.markdown(message['content'])
 
-
-def clear_input():
-    st.session_state.user_input = ''
-
-
-if 'user_input' not in st.session_state:
-    st.session_state.user_input = ''
-
-user_question = st.chat_input("You: ")
-
-
+# Chat input
+user_question = st.chat_input("Ask me about scholarships...")
 
 if user_question:
-    st.session_state.user_input = user_question
-
-   # Set session name based on the summary of the first user input
+    # Set session name based on the summary of the first user input
     if st.session_state.current_session_name is None:
-        st.session_state.current_session_name = generate_session_name(st.session_state.user_input)
-        
-        # Add user message to chat history
-    st.session_state["messages"].append({"role": "user", "content": st.session_state.user_input})
+        st.session_state.current_session_name = generate_session_name(user_question, st.session_state['bot'])
+    
+    # Add user message to chat history
+    st.session_state["messages"].append({"role": "user", "content": user_question})
     
     # Display user message
     with st.chat_message("user"):
-        st.markdown(st.session_state.user_input)
-        
-    if st.session_state.conversation_state == "start":
-        prompt = ChatPromptTemplate.from_messages([
-            SystemMessage(content=system_prompt),
-            MessagesPlaceholder(variable_name="chat_history"),
-            HumanMessagePromptTemplate.from_template("{human_input}"),
-        ])
-        
-    elif st.session_state.conversation_state == "awaiting_confirmation":
-        prompt = ChatPromptTemplate.from_messages([
-            SystemMessage(content=system_prompt),
-            MessagesPlaceholder(variable_name="chat_history"),
-            HumanMessagePromptTemplate.from_template("{human_input}"),
-            HumanMessagePromptTemplate.from_template("The user has confirmed the scholarships. Proceed with application guidance."),
-        ])
+        st.markdown(user_question)
     
-    elif st.session_state.conversation_state == "providing_guidance":
-        # Define a prompt suitable for providing detailed guidance
-        prompt = ChatPromptTemplate.from_messages([
-            SystemMessage(content=system_prompt),
-            MessagesPlaceholder(variable_name="chat_history"),
-            HumanMessagePromptTemplate.from_template("{human_input}"),
-            HumanMessagePromptTemplate.from_template("Proceeding with detailed guidance on the scholarship application process."),
-        ])
-        
-    else:
-        # Handle any unexpected conversation states
-        st.warning(f"Unexpected conversation state: {st.session_state.conversation_state}. Resetting to 'start'.")
-        st.session_state.conversation_state = "start"
-        prompt = ChatPromptTemplate.from_messages([
-            SystemMessage(content=system_prompt),
-            MessagesPlaceholder(variable_name="chat_history"),
-            HumanMessagePromptTemplate.from_template("{human_input}"),
-        ])
-       
-    conversation = LLMChain(
-        llm=llm_mod,
-        prompt=prompt,
-        verbose=False,
-        memory=memory,
-    )
-    
-    
-    with st.spinner("Thinking..."):
+    # Process message with bot
+    with st.spinner("Thinking and searching..."):
         try:
-            response = conversation.predict(human_input=st.session_state.user_input)
-            if "Do you confirm the above data?" in response:
-                st.session_state.conversation_state = "awaiting_confirmation"
-            elif "Proceeding with detailed guidance" in response:
-                st.session_state.conversation_state = "providing_guidance"
-            else:
-                st.session_state.conversation_state = "start"
+            response = st.session_state['bot'].process_message(user_question)
         except Exception as e:
             st.error(f"An error occurred: {str(e)}")
             response = "Sorry, I'm having trouble processing your request right now. Please try again later."
-            
+    
     # Add bot response to chat history
     st.session_state['messages'].append({"role": "assistant", "content": response})
-    
     
     # Display bot response
     with st.chat_message("assistant"):
         st.markdown(response)
     
-    clear_input() # Clear the input field
-    
     # Save the current session automatically
     save_current_session()
+    
+    # Rerun to update the sidebar profile display
+    st.rerun()

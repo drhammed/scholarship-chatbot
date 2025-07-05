@@ -17,7 +17,8 @@ pinecone-client==3.2.2
 openai==1.35.7
 orjson==3.10.3
 uritemplate==4.1.1
-#urllib3==2.2.1
 voyageai==0.2.3
 Werkzeug==3.0.3
 markdown2==2.4.13
+tavily-python==0.3.3
+pydantic==2.5.0
