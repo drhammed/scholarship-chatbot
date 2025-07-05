@@ -79,10 +79,10 @@ class ScholarshipBot:
         
         # Initialize clients
         self.groq_chat = ChatGroq(
-            groq_api_key=self.groq_api_key,
-            model_name='llama3-70b-8192',
+            api_key=self.groq_api_key,  
+            model='llama3-70b-8192',   
             temperature=0.02
-        )
+            )
         self.tavily_client = TavilyClient(api_key=self.tavily_api_key)
         
         # Initialize conversation state
