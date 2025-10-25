@@ -18,9 +18,8 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Title and description
+# Title
 st.title("🎓 Scholarship Chatbot")
-st.write("Hello! I'm here to help you find scholarships and funding opportunities. Let's get started!")
 
 # Sidebar for model selection and configuration
 with st.sidebar:
@@ -97,7 +96,7 @@ with st.sidebar:
                 st.write(f"**Education Level:** {profile.education_level or 'Not set'}")
                 st.write(f"**Location:** {profile.location or 'Not set'}")
                 st.write(f"**Citizenship:** {profile.citizenship or 'Not set'}")
-                st.write(f"**GPA:** {profile.gpa if profile.gpa > 0 else 'Not set'}")
+                st.write(f"**GPA:** {profile.gpa if (isinstance(profile.gpa, (int, float)) and profile.gpa > 0) or (isinstance(profile.gpa, str) and profile.gpa.strip()) else 'Not set'}")
                 st.write(f"**Financial Need:** {profile.financial_need or 'Not set'}")
                 st.write(f"**Research Interests:** {', '.join(profile.research_interests) if profile.research_interests else 'Not set'}")
                 st.write(f"**Career Goals:** {profile.career_goals or 'Not set'}")
@@ -133,15 +132,11 @@ for message in st.session_state.messages:
 
 # Initialize with welcome message
 if len(st.session_state.messages) == 0:
-    welcome_msg = """
-     **Welcome to your Scholarship Assistant!**
+    welcome_msg = """Hello! I'm here to help you find scholarships that match your profile.
 
-    I'm here to help you discover scholarship opportunities that match your profile.
+To get started, please tell me about your academic background. You can share multiple details in one message (field of study, education level, location, citizenship, GPA, etc.) or we can go step by step.
 
-    To get started, I'll need to learn a bit about you - your field of study, education level, location, and citizenship. This information helps me find the most relevant scholarships for you.
-
-    **What field of study are you interested in?**
-    """
+What would you like to share about yourself?"""
     st.session_state.messages.append({"role": "assistant", "content": welcome_msg})
     with st.chat_message("assistant"):
         st.markdown(welcome_msg)

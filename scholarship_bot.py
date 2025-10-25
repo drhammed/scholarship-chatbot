@@ -24,7 +24,7 @@ class ConversationState(Enum):
 class UserProfile:
     field_of_study: str = ""
     education_level: str = ""
-    gpa: float = 0.0
+    gpa: Any = ""  # Can be str, float, or empty
     location: str = ""
     citizenship: str = ""
     financial_need: str = ""
@@ -43,12 +43,18 @@ class UserProfile:
         return all(field.strip() for field in required_fields)
     
     def to_search_context(self) -> str:
+        gpa_display = 'Not specified'
+        if isinstance(self.gpa, (int, float)) and self.gpa > 0:
+            gpa_display = str(self.gpa)
+        elif isinstance(self.gpa, str) and self.gpa.strip():
+            gpa_display = self.gpa
+
         return f"""
         Field of Study: {self.field_of_study}
         Education Level: {self.education_level}
         Location: {self.location}
         Citizenship: {self.citizenship}
-        GPA: {self.gpa if self.gpa > 0 else 'Not specified'}
+        GPA: {gpa_display}
         Financial Need: {self.financial_need}
         Research Interests: {', '.join(self.research_interests) if self.research_interests else 'Not specified'}
         Career Goals: {self.career_goals}
@@ -108,47 +114,56 @@ class ScholarshipBot:
 
     def profiler_agent(self, user_input: str) -> str:
         """Agent 1: Profiles the user and extracts relevant information"""
-        
+
+        # Extract information from user input FIRST
+        self._extract_profile_info(user_input)
+
+        # Check if profile is complete after extraction
+        if self.user_profile.is_complete():
+            self.state = ConversationState.SEARCHING
+            return "Great! I have enough information. Let me search for relevant scholarships for you..."
+
         system_prompt = f"""
         You are a Profiler Agent for a scholarship guidance system. Your job is to gather complete user information.
-        
+
         Current user profile:
         {self.user_profile.to_search_context()}
-        
+
         IMPORTANT RULES:
-        1. Ask ONE question at a time to gather missing information
-        2. Extract and update profile information from user responses
-        3. Required fields: field_of_study, education_level, location, citizenship
+        1. ONLY ask for ONE missing piece of information at a time
+        2. Be conversational and friendly, but concise
+        3. Required fields that MUST be collected: field_of_study, education_level, location, citizenship
         4. Optional but helpful: GPA, financial_need, research_interests, career_goals, extracurriculars
-        5. Be conversational and friendly
-        6. When asking about citizenship, clarify: "What is your citizenship/nationality? This is crucial as scholarships have specific eligibility requirements based on citizenship."
-        7. Once you have the required information, say "PROFILE_COMPLETE" to proceed to search
-        
-        Focus on gathering the most important missing information first. Emphasize that citizenship information is critical for finding eligible scholarships.
+        5. When asking about citizenship, clarify: "What is your citizenship/nationality? This is crucial as scholarships have specific eligibility requirements."
+        6. If you have all required information, respond with ONLY: "PROFILE_COMPLETE"
+        7. DO NOT include any search messages or extra confirmations in your response
+        8. Focus on the most critical missing field first (prioritize: citizenship > field_of_study > education_level > location)
+
+        RESPONSE FORMAT:
+        - If missing information: Ask ONE specific question only
+        - If profile complete: Respond with exactly "PROFILE_COMPLETE" (nothing else)
         """
-        
+
         prompt = ChatPromptTemplate.from_messages([
             SystemMessage(content=system_prompt),
             MessagesPlaceholder(variable_name="chat_history"),
             HumanMessagePromptTemplate.from_template("{human_input}")
         ])
-        
+
         conversation = LLMChain(
             llm=self.llm,
             prompt=prompt,
             verbose=False,
             memory=self.memory
         )
-        
+
         response = conversation.predict(human_input=user_input)
-        
-        # Extract information from user input
-        self._extract_profile_info(user_input)
-        
-        if "PROFILE_COMPLETE" in response or self.user_profile.is_complete():
+
+        # Check again after LLM response
+        if "PROFILE_COMPLETE" in response:
             self.state = ConversationState.SEARCHING
-            return f"{response}\n\nGreat! I have enough information. Let me search for relevant scholarships for you..."
-        
+            return "Great! I have enough information. Let me search for relevant scholarships for you..."
+
         return response
 
     def research_agent(self, query: str) -> Dict[str, Any]:
