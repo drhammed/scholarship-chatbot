@@ -366,9 +366,9 @@ class ScholarshipBot:
 
     def process_message(self, user_input: str) -> str:
         """Main message processing orchestrator"""
-        
+
         user_input_lower = user_input.strip().lower()
-        
+
         # Handle confirmations
         if self.pending_confirmation:
             if user_input_lower in ['yes', 'y', 'ok', 'sure']:
@@ -378,30 +378,46 @@ class ScholarshipBot:
             elif user_input_lower in ['no', 'n', 'not now']:
                 self.pending_confirmation = None
                 return "No problem! Feel free to ask if you need help with anything else regarding scholarships."
-        
+
         # Route to appropriate agent based on state
         if self.state == ConversationState.PROFILING:
-            return self.profiler_agent(user_input)
-        
+            profiler_response = self.profiler_agent(user_input)
+
+            # If profiling is complete, automatically proceed with search
+            if self.state == ConversationState.SEARCHING:
+                try:
+                    search_results = self.research_agent(user_input)
+                    if isinstance(search_results, dict) and "error" in search_results:
+                        return f"{profiler_response}\n\nHowever, I encountered an error while searching: {search_results['error']}. Please try again."
+
+                    self.state = ConversationState.RESPONDING
+                    scholarship_response = self.response_agent(search_results)
+                    return f"{profiler_response}\n\n{scholarship_response}"
+
+                except Exception as e:
+                    return f"{profiler_response}\n\nHowever, I encountered an error while searching for scholarships: {str(e)}. Please try again."
+
+            return profiler_response
+
         elif self.state == ConversationState.SEARCHING:
             try:
                 search_results = self.research_agent(user_input)
                 if isinstance(search_results, dict) and "error" in search_results:
                     return f"I encountered an error while searching: {search_results['error']}. Please try again."
-                
+
                 self.state = ConversationState.RESPONDING
                 return self.response_agent(search_results)
-                
+
             except Exception as e:
                 return f"I encountered an error while searching for scholarships: {str(e)}. Please try again."
-        
+
         elif self.state == ConversationState.RESPONDING:
             # Handle additional questions or requests
             return self._handle_followup_questions(user_input)
-        
+
         elif self.state == ConversationState.COMPLETE:
             return self._handle_followup_questions(user_input)
-        
+
         return "I'm here to help you find scholarships! Let's start by getting to know your academic background."
 
     def _handle_followup_questions(self, user_input: str) -> str:
