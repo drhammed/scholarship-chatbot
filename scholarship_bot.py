@@ -123,26 +123,60 @@ class ScholarshipBot:
             self.state = ConversationState.SEARCHING
             return "Great! I have enough information. Let me search for relevant scholarships for you..."
 
+        # Check if this is just a greeting without profile info
+        greeting_words = ['hi', 'hello', 'hey', 'good morning', 'good afternoon', 'good evening', 'greetings']
+        user_input_lower = user_input.lower().strip()
+        is_greeting = any(greeting in user_input_lower for greeting in greeting_words) and len(user_input.split()) < 10
+
         system_prompt = f"""
-        You are a Profiler Agent for a scholarship guidance system. Your job is to gather complete user information.
+        You are a Profiler Agent for a scholarship guidance system using ReAct (Reasoning + Acting) methodology.
+
+        **REASONING PROCESS (Chain of Thought)**:
+        1. **OBSERVE**: Check what profile information the user has already provided
+        2. **ANALYZE**: Identify which required fields are still missing
+        3. **PRIORITIZE**: Determine the most critical missing field
+        4. **ACT**: Ask for ONE specific piece of information OR confirm profile is complete
 
         Current user profile:
         {self.user_profile.to_search_context()}
 
-        IMPORTANT RULES:
-        1. ONLY ask for ONE missing piece of information at a time
-        2. Be conversational and friendly, but concise
-        3. Required fields that MUST be collected: field_of_study, education_level, location, citizenship
-        4. Optional but helpful: GPA, financial_need, research_interests, career_goals, extracurriculars
-        5. When asking about citizenship, clarify: "What is your citizenship/nationality? This is crucial as scholarships have specific eligibility requirements."
-        6. If you have all required information, respond with ONLY: "PROFILE_COMPLETE"
-        7. DO NOT include any search messages or extra confirmations in your response
-        8. Focus on the most critical missing field first (prioritize: citizenship > field_of_study > education_level > location)
+        **REQUIRED FIELDS** (must collect all):
+        - citizenship (HIGHEST priority - needed for eligibility)
+        - field_of_study
+        - education_level
+        - location
 
-        RESPONSE FORMAT:
-        - If missing information: Ask ONE specific question only
-        - If profile complete: Respond with exactly "PROFILE_COMPLETE" (nothing else)
+        **OPTIONAL BUT HELPFUL**:
+        - GPA
+        - financial_need
+        - research_interests
+        - career_goals
+
+        **RULES**:
+        1. If user just greeted you (e.g., "Hi", "Hello") → Respond warmly and ask for their academic background
+        2. If profile information was provided → Acknowledge it briefly and ask for ONE missing required field
+        3. ONLY ask for ONE piece of information at a time
+        4. Be conversational, friendly, and concise
+        5. Prioritize missing fields: citizenship > field_of_study > education_level > location
+        6. If you have all required information, respond with exactly: "PROFILE_COMPLETE"
+        7. DO NOT ask for information already provided in the current profile
+
+        **RESPONSE STYLE**:
+        - Keep responses short and focused
+        - If greeting: Welcome them and ask about their academic background
+        - If partial info: "Thanks! I see you're studying [field]. Could you tell me..."
+        - If complete: "PROFILE_COMPLETE"
+
+        **EXAMPLES**:
+        User: "Hi"
+        You: "Hello! I'd be happy to help you find scholarships. To get started, could you tell me about your academic background and citizenship?"
+
+        User: "I'm studying Computer Science"
+        You: "Great! Computer Science is an excellent field. What is your citizenship/nationality? This is crucial for finding eligible scholarships."
         """
+
+        if is_greeting:
+            return "Hello! I'd be happy to help you find scholarships. To get started, could you tell me about your academic background (field of study, degree level) and citizenship?"
 
         prompt = ChatPromptTemplate.from_messages([
             SystemMessage(content=system_prompt),
@@ -228,104 +262,155 @@ class ScholarshipBot:
 
     def response_agent(self, search_data: Dict[str, Any]) -> str:
         """Agent 3: Synthesizes search results and provides structured response"""
-        
-        system_prompt = """
-        You are a Response Agent for a scholarship guidance system. Your job is to synthesize search results 
-        and provide comprehensive, actionable scholarship guidance.
-        
-        CRITICAL REQUIREMENTS:
-        1. **CITIZENSHIP ELIGIBILITY FIRST**: Only recommend scholarships that explicitly allow the user's citizenship/nationality
-        2. **SOURCE ATTRIBUTION**: Always include the source URL for each scholarship mentioned using format: [Source: URL]
-        3. **VERIFICATION NOTE**: Always remind users to verify eligibility on the official website
-        
-        RESPONSE STRUCTURE:
-        1. **🎯 Scholarships for [User's Citizenship] Citizens** (3-5 scholarships they can actually apply for)
-        2. **📋 Application Guidance** (specific tips for their profile and citizenship)
-        3. **⏰ Next Steps** (concrete action items with deadlines)
-        4. **🔗 Additional Resources** (relevant links with sources)
-        
-        FORMATTING RULES:
-        - Each scholarship must include: Name, Amount (if available), Deadline, Eligibility, Application process
-        - Include source URL for each scholarship: [Source: website.com]
+
+        from datetime import datetime
+        today_date = datetime.now().strftime("%B %d, %Y")
+
+        system_prompt = f"""
+        You are a Response Agent for a scholarship guidance system using ReAct (Reasoning + Acting) methodology.
+
+        **CURRENT DATE**: {today_date}
+
+        **REASONING PROCESS (Chain of Thought)**:
+        1. **OBSERVE**: Review the user's profile data from the search context
+        2. **ANALYZE**: Examine search results for citizenship-eligible scholarships
+        3. **FILTER**: Remove scholarships with expired deadlines (before {today_date})
+        4. **VERIFY**: Ensure each scholarship explicitly accepts the user's citizenship
+        5. **SYNTHESIZE**: Create a personalized, actionable response
+        6. **ACT**: Provide specific recommendations with sources
+
+        **CRITICAL REQUIREMENTS**:
+        1. **CITIZENSHIP ELIGIBILITY FIRST**: ONLY recommend scholarships that explicitly allow the user's citizenship/nationality
+           - If user is Nigerian, DO NOT recommend US-only or country-specific scholarships unless Nigeria is explicitly mentioned
+           - Look for: "international students", "Nigerian students", "African students", or specific country mentions
+        2. **DATE VERIFICATION**: Today is {today_date} - ONLY include scholarships with future deadlines
+        3. **SOURCE ATTRIBUTION**: Always include the source URL for EVERY scholarship: [Source: URL]
+        4. **PROFILE AWARENESS**: Use the actual profile data provided - DO NOT ask for information already given
+        5. **VERIFICATION NOTE**: Remind users to verify eligibility on official websites
+
+        **RESPONSE STRUCTURE**:
+        1. **Profile Acknowledgment** - Briefly confirm their background (citizenship, field, level)
+        2. **Scholarships for [User's Citizenship] Citizens** (3-5 scholarships with future deadlines they can apply for)
+           - Each must include: Name, Amount, Deadline, Eligibility, URL
+        3. **Application Guidance** (specific tips for their profile and citizenship)
+        4. **Next Steps** (concrete action items with deadlines)
+        5. **Additional Resources** (relevant links with sources)
+
+        **FORMATTING RULES**:
         - Use clear headers and bullet points
+        - Include source URL for each scholarship: [Source: website.com]
         - Emphasize citizenship-specific eligibility criteria
-        - Always ask for confirmation before proceeding with detailed application support
-        
-        AVOID:
-        - Recommending scholarships limited to US citizens unless user is from US
-        - Generic advice without considering user's specific citizenship
-        - Scholarships without clear source attribution
+        - Show deadlines in a clear format
+
+        **CRITICAL - AVOID THESE MISTAKES**:
+        - DO NOT ask for information already in the user profile (field of study, citizenship, education level, location)
+        - DO NOT recommend scholarships limited to specific countries unless user is from that country
+        - DO NOT include scholarships with expired deadlines
+        - DO NOT provide generic advice - make it specific to their citizenship and field
+        - DO NOT recommend scholarships without clear source attribution
         """
-        
+
         search_context = json.dumps(search_data, indent=2)
-        
+
         prompt = ChatPromptTemplate.from_messages([
             SystemMessage(content=system_prompt),
             HumanMessagePromptTemplate.from_template(
-                "Based on this search data and user profile, provide comprehensive scholarship guidance:\n\n{search_context}"
+                "Based on this search data and user profile, provide comprehensive scholarship guidance:\n\n{search_context}\n\nREMEMBER: Use the profile information provided. DO NOT ask for details already given."
             )
         ])
-        
+
         conversation = LLMChain(
             llm=self.llm,
             prompt=prompt,
             verbose=False
         )
-        
+
         response = conversation.predict(search_context=search_context)
-        
+
         # Set up confirmation for next steps
         self.pending_confirmation = "application_support"
-        
+
         return response + "\n\n" + "Would you like me to provide detailed application support for any of these scholarships? (Yes/No)"
 
     def _extract_profile_info(self, user_input: str):
         """Extract profile information from user input using LLM"""
-        
-        extraction_prompt = f"""
-        Extract profile information from this user input: "{user_input}"
-        
-        Current profile: {self.user_profile.to_search_context()}
-        
-        Return ONLY a JSON object with any new information found. Use these exact keys:
-        - field_of_study
-        - education_level  
-        - gpa
-        - location
-        - citizenship
-        - financial_need
-        - research_interests (array)
-        - career_goals
-        - extracurriculars (array)
-        
-        If no new information is found, return empty JSON {{}}.
+
+        system_prompt = """
+        You are an Information Extraction Agent. Your task is to extract scholarship-relevant profile information from user messages.
+
+        REASONING PROCESS (Chain of Thought):
+        1. Read the user input carefully
+        2. Identify any profile-related information mentioned
+        3. Map the information to the appropriate profile fields
+        4. Return ONLY valid JSON
+
+        EXTRACTION RULES:
+        - field_of_study: Academic major/field (e.g., "Computer Science", "Engineering", "Business")
+        - education_level: Degree level (e.g., "Bachelor's", "BSc", "Master's", "PhD", "Undergraduate", "Graduate")
+        - gpa: Academic performance (e.g., "4.57/5.00", "3.8/4.0", "First Class")
+        - location: Current/intended study location (e.g., "Nigeria", "USA", "University of Lagos")
+        - citizenship: Nationality/citizenship (e.g., "Nigerian", "American", "Indian")
+        - financial_need: Funding requirements (e.g., "fully-funded", "partial funding", "tuition only")
+        - research_interests: Array of research topics (e.g., ["Natural Language Processing", "Machine Learning"])
+        - career_goals: Professional aspirations
+        - extracurriculars: Array of activities
+
+        EXAMPLES:
+        Input: "I'm a Nigerian with a BSc in Computer Science, CGPA 4.57/5.00"
+        Output: {"citizenship": "Nigerian", "field_of_study": "Computer Science", "education_level": "Bachelor's", "gpa": "4.57/5.00", "location": "Nigeria"}
+
+        Input: "I want fully-funded scholarships for NLP and AI research"
+        Output: {"financial_need": "fully-funded", "research_interests": ["Natural Language Processing", "Artificial Intelligence"]}
+
+        Return ONLY a valid JSON object with extracted fields. If nothing found, return {}
         """
-        
+
         try:
+            prompt = ChatPromptTemplate.from_messages([
+                SystemMessage(content=system_prompt),
+                HumanMessagePromptTemplate.from_template(
+                    "Current profile:\n{current_profile}\n\nUser input to extract from:\n{user_input}"
+                )
+            ])
+
             conversation = LLMChain(
                 llm=self.llm,
-                prompt=ChatPromptTemplate.from_messages([
-                    SystemMessage(content=extraction_prompt)
-                ]),
+                prompt=prompt,
                 verbose=False
             )
 
-            result = conversation.predict(input="extract")
-            
+            result = conversation.predict(
+                current_profile=self.user_profile.to_search_context(),
+                user_input=user_input
+            )
+
+            # Clean up the result to extract JSON
+            result = result.strip()
+            # Remove markdown code blocks if present
+            if result.startswith("```json"):
+                result = result[7:]
+            if result.startswith("```"):
+                result = result[3:]
+            if result.endswith("```"):
+                result = result[:-3]
+            result = result.strip()
+
             # Try to parse JSON and update profile
             try:
-                extracted_data = json.loads(result.strip())
-                for key, value in extracted_data.items():
-                    if hasattr(self.user_profile, key) and value:
-                        if isinstance(value, list):
-                            current_list = getattr(self.user_profile, key) or []
-                            updated_list = list(set(current_list + value))
-                            setattr(self.user_profile, key, updated_list)
-                        else:
-                            setattr(self.user_profile, key, value)
-            except json.JSONDecodeError:
-                pass  # Continue without extraction if JSON parsing fails
-                
+                extracted_data = json.loads(result)
+                if extracted_data:  # Only process if we got data
+                    for key, value in extracted_data.items():
+                        if hasattr(self.user_profile, key) and value:
+                            if isinstance(value, list):
+                                current_list = getattr(self.user_profile, key) or []
+                                updated_list = list(set(current_list + value))
+                                setattr(self.user_profile, key, updated_list)
+                            else:
+                                setattr(self.user_profile, key, value)
+                    print(f"[DEBUG] Extracted profile data: {extracted_data}")
+            except json.JSONDecodeError as je:
+                print(f"JSON parsing error: {je}\nReceived: {result}")
+
         except Exception as e:
             print(f"Profile extraction error: {e}")
 
