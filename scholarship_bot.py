@@ -85,7 +85,7 @@ class ScholarshipBot:
         else:
             if not groq_api_key:
                 raise ValueError("GROQ_API_KEY is required when using Groq")
-            self.llm = ChatGroq(
+            self.llm = ChatGroq(  # type: ignore[call-arg]
                 api_key=groq_api_key,
                 model=model_name,
                 temperature=0.02
