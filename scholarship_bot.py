@@ -540,15 +540,40 @@ class ScholarshipBot:
 
         user_input_lower = user_input.lower()
 
-        # Check if user is asking for a new search with different criteria
-        new_search_keywords = [
-            'us ', 'usa', 'canada', 'uk', 'europe', 'australia',
-            'master', 'phd', 'doctoral', 'undergraduate', 'graduate',
-            'different field', 'change my', 'instead of', 'looking for'
+        # First, check if this is a general advice/how-to question (DON'T trigger search)
+        advice_keywords = [
+            'how to', 'how can i', 'how do i', 'how should i',
+            'email professor', 'cold email', 'contact professor',
+            'write sop', 'statement of purpose', 'personal statement',
+            'recommendation letter', 'reference letter', 'lor',
+            'cv', 'resume', 'application tips', 'interview',
+            'what should i', 'should i mention', 'what to include',
+            'tips for', 'advice on', 'help with', 'guide to'
         ]
 
-        # Check if user is refining their search location/criteria
-        is_refining_search = any(keyword in user_input_lower for keyword in new_search_keywords)
+        is_advice_question = any(keyword in user_input_lower for keyword in advice_keywords)
+
+        # Check if user is asking for a new search with different criteria
+        # But ONLY if it's not an advice question
+        search_refinement_keywords = [
+            'scholarships in', 'opportunities in', 'programs in',
+            'find me', 'search for', 'look for',
+            'show me', 'give me', 'list of'
+        ]
+
+        location_keywords = ['us ', 'usa', 'canada', 'uk', 'europe', 'australia', 'germany', 'france']
+        degree_keywords = ['master', 'phd', 'doctoral', 'undergraduate', 'graduate', 'postdoc']
+
+        # Only trigger new search if explicitly asking for scholarships/programs in a location
+        # or asking for different degree level opportunities
+        is_refining_search = False
+        if not is_advice_question:
+            has_search_intent = any(keyword in user_input_lower for keyword in search_refinement_keywords)
+            has_location = any(keyword in user_input_lower for keyword in location_keywords)
+            has_degree_change = any(keyword in user_input_lower for keyword in degree_keywords) and \
+                               any(word in user_input_lower for word in ['want', 'looking', 'find', 'search'])
+
+            is_refining_search = has_search_intent or (has_location and len(user_input.split()) < 15) or has_degree_change
 
         if is_refining_search:
             # Update profile if they're specifying new preferences
@@ -571,42 +596,63 @@ class ScholarshipBot:
             except Exception as e:
                 return f"I encountered an error while searching for scholarships with your updated criteria: {str(e)}. Please try again."
 
-        # Otherwise, answer based on existing search results
+        # Otherwise, answer based on existing search results OR provide general advice
+        # Determine if this is an advice question
+        question_type = "advice" if is_advice_question else "scholarship_info"
+
         system_prompt = f"""
-        You are a Response Agent for a scholarship guidance system using ReAct methodology. The user has asked a follow-up question.
+        You are a Scholarship Guidance Assistant using ReAct methodology. The user has asked a follow-up question.
 
         **CURRENT DATE**: {today_date}
+        **QUESTION TYPE**: {question_type}
 
         **REASONING PROCESS**:
-        1. **OBSERVE**: Read the user's follow-up question carefully
-        2. **ANALYZE**: Check what information from search results is relevant
-        3. **FILTER**: Remove expired scholarships (deadline before {today_date})
-        4. **VERIFY**: Ensure recommendations match their current requirements
-        5. **ACT**: Provide specific, actionable response
+        1. **OBSERVE**: Read the user's question carefully and determine what they need
+        2. **ANALYZE**: Decide if this is about:
+           - General application advice (how to write emails, SOPs, etc.)
+           - Specific scholarship information from search results
+        3. **SYNTHESIZE**: Use appropriate context (general knowledge OR search results)
+        4. **ACT**: Provide helpful, actionable response
 
         User Profile:
         {self.user_profile.to_search_context()}
 
-        Previous Search Results:
-        {json.dumps(self.search_results, indent=2)}
+        Previous Search Results (if relevant):
+        {json.dumps(self.search_results, indent=2) if self.search_results else "No previous search"}
 
-        **CRITICAL INSTRUCTIONS**:
-        1. **DATE AWARENESS**: Today is {today_date} - ONLY recommend scholarships with future deadlines
-        2. **LOCATION SPECIFICITY**: If they ask for US/Canada/UK scholarships, ONLY show scholarships for those locations
-        3. **SOURCE ATTRIBUTION**: Always include source URLs for any scholarships mentioned
-        4. **SPECIFIC ANSWERS**: Answer based on the search results - don't give generic advice
-        5. **ADMIT LIMITATIONS**: If search results don't have what they're asking for, offer to do a new search
+        **INSTRUCTIONS BASED ON QUESTION TYPE**:
+
+        **FOR ADVICE QUESTIONS** (e.g., "How to email a professor?", "How to write SOP?"):
+        - Provide comprehensive, actionable advice
+        - Use general best practices for academic applications
+        - Tailor advice to their profile (citizenship, field, education level)
+        - Be specific and practical with examples
+        - You DON'T need to reference search results for general advice
+
+        **FOR SCHOLARSHIP-SPECIFIC QUESTIONS** (e.g., "Which scholarships are still open?"):
+        - Use search results to answer
+        - Today is {today_date} - ONLY recommend scholarships with future deadlines
+        - Include source URLs for any scholarships mentioned
+        - If no relevant results: Offer to do a new search
 
         **RESPONSE FORMAT**:
         - Use clear headers and bullet points
-        - Include: Scholarship Name, Deadline, Eligibility, Source URL
-        - For expired scholarships: State "This deadline has passed"
-        - If no relevant results: "I don't have scholarships matching [criteria] in my current search. Would you like me to search specifically for [criteria]?"
+        - Be concise but comprehensive
+        - Provide actionable steps/tips
+        - For advice: Include examples when helpful
+        - For scholarships: Include Name, Deadline, Eligibility, Source URL
+
+        **EXAMPLES OF ADVICE RESPONSES**:
+        Q: "How can I email a Professor?"
+        A: Provide structure: Subject line, Introduction, Research interest alignment, Specific ask, Professional closing. Include DO's and DON'Ts.
+
+        Q: "How to write Statement of Purpose?"
+        A: Cover: Opening hook, Academic background, Research interests, Why this program/university, Career goals, Conclusion. Include tips specific to their field ({self.user_profile.field_of_study}).
 
         **AVOID**:
-        - Recommending scholarships with past deadlines as if they're still available
-        - Generic information not backed by search results
-        - Scholarships that don't match their location/field requirements
+        - Vague, generic responses
+        - Saying "I don't know" when you can provide general guidance
+        - Trying to force scholarship recommendations when they're asking for advice
         """
 
         prompt = ChatPromptTemplate.from_messages([
