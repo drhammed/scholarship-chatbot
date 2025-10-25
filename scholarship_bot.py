@@ -202,21 +202,37 @@ class ScholarshipBot:
 
     def research_agent(self, query: str) -> Dict[str, Any]:
         """Agent 2: Performs live web search using Tavily"""
-        
-        # Construct citizenship-specific search queries
+
+        from datetime import datetime
+        current_year = datetime.now().year
+        next_year = current_year + 1
+
+        # Determine target location for studies (could be different from current location)
+        study_location = self.user_profile.location
+        if 'United States' in study_location or 'USA' in study_location or 'US' in study_location:
+            location_keywords = "USA United States American universities"
+        elif 'Canada' in study_location or 'Canadian' in study_location:
+            location_keywords = "Canada Canadian universities"
+        elif 'United Kingdom' in study_location or 'UK' in study_location:
+            location_keywords = "UK United Kingdom British universities"
+        else:
+            location_keywords = f"{study_location} universities"
+
+        # Construct citizenship-specific search queries with current year
         citizenship_query = f"""
-        scholarships grants funding for {self.user_profile.citizenship} citizens 
-        {self.user_profile.field_of_study} {self.user_profile.education_level} 
-        international students 2024 2025
+        scholarships grants funding {self.user_profile.citizenship} citizens
+        {self.user_profile.field_of_study} {self.user_profile.education_level}
+        international students {current_year} {next_year} open deadline
         """
-        
-        # Also search for location-specific opportunities
+
+        # Location-specific opportunities with date relevance
         location_query = f"""
-        scholarships {self.user_profile.location} university 
+        scholarships {location_keywords}
         {self.user_profile.field_of_study} {self.user_profile.education_level}
         {self.user_profile.citizenship} international students
+        {current_year} {next_year} application open deadline
         """
-        
+
         try:
             # Primary search focused on citizenship eligibility
             citizenship_results = self.tavily_client.search(
@@ -226,36 +242,42 @@ class ScholarshipBot:
                 include_answer=True,
                 include_raw_content=False
             )
-            
+
             # Secondary search for institution-specific scholarships
             location_results = self.tavily_client.search(
                 query=location_query,
-                search_depth="advanced", 
+                search_depth="advanced",
                 max_results=4,
                 include_answer=True,
                 include_raw_content=False
             )
-            
-            # Search for application tips
-            tips_query = f"scholarship application tips {self.user_profile.field_of_study} personal statement {self.user_profile.citizenship}"
-            tips_results = self.tavily_client.search(
-                query=tips_query,
-                search_depth="basic",
-                max_results=3,
-                include_answer=True
+
+            # Search for current open deadlines
+            deadline_query = f"""
+            {self.user_profile.field_of_study} scholarships {self.user_profile.citizenship}
+            {location_keywords} deadline {current_year} {next_year} still open accepting applications
+            """
+            deadline_results = self.tavily_client.search(
+                query=deadline_query,
+                search_depth="advanced",
+                max_results=5,
+                include_answer=True,
+                include_raw_content=False
             )
-            
+
             # Combine results with source tracking
             all_results = {
                 'citizenship_scholarships': citizenship_results,
                 'location_scholarships': location_results,
-                'application_tips': tips_results,
-                'user_profile': self.user_profile.to_search_context()
+                'current_deadlines': deadline_results,
+                'user_profile': self.user_profile.to_search_context(),
+                'search_date': datetime.now().strftime("%B %d, %Y"),
+                'target_years': f"{current_year}-{next_year}"
             }
-            
+
             self.search_results = all_results
             return all_results
-            
+
         except Exception as e:
             print(f"Search error: {e}")
             return {"error": str(e)}
@@ -456,13 +478,18 @@ class ScholarshipBot:
 
         # Handle confirmations
         if self.pending_confirmation:
-            if user_input_lower in ['yes', 'y', 'ok', 'sure']:
+            if user_input_lower in ['yes', 'y', 'ok', 'sure', 'yeah', 'yep']:
                 if self.pending_confirmation == "application_support":
                     self.pending_confirmation = None
                     return self._provide_application_support()
-            elif user_input_lower in ['no', 'n', 'not now']:
+            elif user_input_lower in ['no', 'n', 'not now', 'nope', 'nah']:
                 self.pending_confirmation = None
                 return "No problem! Feel free to ask if you need help with anything else regarding scholarships."
+            else:
+                # User is asking a different question instead of answering yes/no
+                # Clear pending confirmation and route to follow-up handler
+                self.pending_confirmation = None
+                # Don't return here, let it fall through to state handling
 
         # Route to appropriate agent based on state
         if self.state == ConversationState.PROFILING:
@@ -511,10 +538,51 @@ class ScholarshipBot:
         from datetime import datetime
         today_date = datetime.now().strftime("%B %d, %Y")
 
+        user_input_lower = user_input.lower()
+
+        # Check if user is asking for a new search with different criteria
+        new_search_keywords = [
+            'us ', 'usa', 'canada', 'uk', 'europe', 'australia',
+            'master', 'phd', 'doctoral', 'undergraduate', 'graduate',
+            'different field', 'change my', 'instead of', 'looking for'
+        ]
+
+        # Check if user is refining their search location/criteria
+        is_refining_search = any(keyword in user_input_lower for keyword in new_search_keywords)
+
+        if is_refining_search:
+            # Update profile if they're specifying new preferences
+            if 'us' in user_input_lower or 'usa' in user_input_lower or 'united states' in user_input_lower:
+                self.user_profile.location = 'United States'
+            elif 'canada' in user_input_lower or 'canadian' in user_input_lower:
+                self.user_profile.location = 'Canada'
+            elif 'uk' in user_input_lower or 'united kingdom' in user_input_lower or 'britain' in user_input_lower:
+                self.user_profile.location = 'United Kingdom'
+
+            # Perform a new search with updated criteria
+            try:
+                search_results = self.research_agent(user_input)
+                if isinstance(search_results, dict) and "error" in search_results:
+                    return f"I'll search for scholarships with your updated criteria.\n\nHowever, I encountered an error: {search_results['error']}. Please try again."
+
+                # Generate new response with updated search results
+                return self.response_agent(search_results)
+
+            except Exception as e:
+                return f"I encountered an error while searching for scholarships with your updated criteria: {str(e)}. Please try again."
+
+        # Otherwise, answer based on existing search results
         system_prompt = f"""
-        You are a Response Agent for a scholarship guidance system. The user has asked a follow-up question.
+        You are a Response Agent for a scholarship guidance system using ReAct methodology. The user has asked a follow-up question.
 
         **CURRENT DATE**: {today_date}
+
+        **REASONING PROCESS**:
+        1. **OBSERVE**: Read the user's follow-up question carefully
+        2. **ANALYZE**: Check what information from search results is relevant
+        3. **FILTER**: Remove expired scholarships (deadline before {today_date})
+        4. **VERIFY**: Ensure recommendations match their current requirements
+        5. **ACT**: Provide specific, actionable response
 
         User Profile:
         {self.user_profile.to_search_context()}
@@ -522,18 +590,23 @@ class ScholarshipBot:
         Previous Search Results:
         {json.dumps(self.search_results, indent=2)}
 
-        IMPORTANT INSTRUCTIONS:
-        1. If the user asks about deadlines or current/open scholarships, ALWAYS check against today's date: {today_date}
-        2. Filter out any scholarships with deadlines that have already passed
-        3. Provide specific, actionable information based on the search results
-        4. Include source URLs for any scholarships mentioned
-        5. If they want to search for different scholarships or you don't have enough information to answer, let them know you can help with a new search
-        6. Be comprehensive and specific - don't give vague responses
+        **CRITICAL INSTRUCTIONS**:
+        1. **DATE AWARENESS**: Today is {today_date} - ONLY recommend scholarships with future deadlines
+        2. **LOCATION SPECIFICITY**: If they ask for US/Canada/UK scholarships, ONLY show scholarships for those locations
+        3. **SOURCE ATTRIBUTION**: Always include source URLs for any scholarships mentioned
+        4. **SPECIFIC ANSWERS**: Answer based on the search results - don't give generic advice
+        5. **ADMIT LIMITATIONS**: If search results don't have what they're asking for, offer to do a new search
 
-        RESPONSE FORMAT:
+        **RESPONSE FORMAT**:
         - Use clear headers and bullet points
-        - Include scholarship names, deadlines, and source URLs
-        - For date-sensitive queries, explicitly state which scholarships are still open
+        - Include: Scholarship Name, Deadline, Eligibility, Source URL
+        - For expired scholarships: State "This deadline has passed"
+        - If no relevant results: "I don't have scholarships matching [criteria] in my current search. Would you like me to search specifically for [criteria]?"
+
+        **AVOID**:
+        - Recommending scholarships with past deadlines as if they're still available
+        - Generic information not backed by search results
+        - Scholarships that don't match their location/field requirements
         """
 
         prompt = ChatPromptTemplate.from_messages([
