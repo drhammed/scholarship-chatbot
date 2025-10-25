@@ -1,7 +1,7 @@
 import streamlit as st
 import os
 from dotenv import load_dotenv
-from scholarship_bot import ScholarshipBot, ConversationState
+from scholarship_bot import ScholarshipBot
 import warnings
 
 # Ignore warnings
@@ -12,92 +12,119 @@ load_dotenv()
 
 # Set page config
 st.set_page_config(
-    page_title="Scholarship Chatbot by drhammed",
+    page_title="Scholarship Chatbot",
     page_icon="🎓",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
 # Title and description
-st.title("Scholarship Chatbot by drhammed")
-st.write("Hello! I'm your friendly chatbot. I'm here to help answer your questions regarding scholarships and funding for students, and provide information. I'm also super fast! Let's start!")
+st.title("🎓 Scholarship Chatbot")
+st.write("Hello! I'm here to help you find scholarships and funding opportunities. Let's get started!")
 
-# Sidebar for configuration
+# Sidebar for model selection and configuration
 with st.sidebar:
-    st.header("Configuration")
-    
-    # Model selection
-    model_options = [
-        "llama3-70b-8192",
-        "llama3-8b-8192", 
-        "llama-3.2-3b-preview",
-        "llama-3.2-1b-preview"
-    ]
-    selected_model = st.selectbox("Select Model", model_options, index=0)
-    
-    # API Keys (from secrets or environment)
+    st.header("Settings")
+
+    # Model Selection
+    st.subheader("Model Provider")
+    model_provider = st.selectbox(
+        "Choose Provider:",
+        ["Ollama (Cloud)", "Groq"]
+    )
+
+    if model_provider == "Ollama (Cloud)":
+        ollama_models = [
+            'gpt-oss:20b',
+            'gpt-oss:120b'
+        ]
+        selected_model = st.selectbox("Model:", ollama_models)
+        use_ollama = True
+    else:  # Groq
+        groq_models = [
+            'meta-llama/llama-4-scout-17b-16e-instruct',
+            'groq/compound-mini',
+            'llama3-70b-8192',
+            'llama3-8b-8192'
+        ]
+        selected_model = st.selectbox("Model:", groq_models)
+        use_ollama = False
+
+    # API Keys
     try:
         groq_api_key = st.secrets["api_keys"]["GROQ_API_KEY"]
         tavily_api_key = st.secrets["api_keys"]["TAVILY_API_KEY"]
-        st.success("✅ API Keys Loaded")
+        ollama_api_key = st.secrets["api_keys"].get("OLLAMA_API_KEY", "")
+        st.success("API Keys Loaded")
     except Exception as e:
         # Try to get from environment variables (for development)
         groq_api_key = os.getenv("GROQ_API_KEY")
         tavily_api_key = os.getenv("TAVILY_API_KEY")
-        
-        if not groq_api_key or not tavily_api_key:
-            st.error("❌ API Keys Not Found")
-            st.error("Please configure GROQ_API_KEY and TAVILY_API_KEY in Streamlit secrets or environment variables")
+        ollama_api_key = os.getenv("OLLAMA_API_KEY", "")
+
+        if not tavily_api_key:
+            st.error("TAVILY_API_KEY Not Found")
+            st.error("Please configure TAVILY_API_KEY in Streamlit secrets or environment variables")
             st.stop()
-        else:
-            st.success("✅ API Keys Loaded from Environment")
-    
+
+        if use_ollama and not ollama_api_key:
+            st.error("OLLAMA_API_KEY Not Found")
+            st.error("Please configure OLLAMA_API_KEY in your .env file or Streamlit secrets")
+            st.stop()
+
+        if not use_ollama and not groq_api_key:
+            st.error("GROQ_API_KEY Not Found")
+            st.error("Please configure GROQ_API_KEY in your .env file or Streamlit secrets")
+            st.stop()
+
+        st.success("API Keys Loaded")
+
+    st.divider()
+
     # Control buttons
-    st.header("Controls")
-    if st.button("🔄 Reset Conversation"):
+    st.subheader("Controls")
+    if st.button("Reset Conversation", use_container_width=True):
         if 'scholarship_bot' in st.session_state:
             st.session_state.scholarship_bot.reset_conversation()
         st.session_state.messages = []
         st.rerun()
-    
-    if st.button("📋 Show Profile"):
+
+    if st.button("View My Profile", use_container_width=True):
         if 'scholarship_bot' in st.session_state:
             profile = st.session_state.scholarship_bot.user_profile
-            st.write("**Current Profile:**")
-            st.write(f"Field of Study: {profile.field_of_study}")
-            st.write(f"Education Level: {profile.education_level}")
-            st.write(f"Location: {profile.location}")
-            st.write(f"Citizenship: {profile.citizenship}")
-            st.write(f"GPA: {profile.gpa}")
-            st.write(f"Financial Need: {profile.financial_need}")
-            st.write(f"Research Interests: {', '.join(profile.research_interests)}")
-            st.write(f"Career Goals: {profile.career_goals}")
+            with st.expander("Your Profile Information", expanded=True):
+                st.write(f"**Field of Study:** {profile.field_of_study or 'Not set'}")
+                st.write(f"**Education Level:** {profile.education_level or 'Not set'}")
+                st.write(f"**Location:** {profile.location or 'Not set'}")
+                st.write(f"**Citizenship:** {profile.citizenship or 'Not set'}")
+                st.write(f"**GPA:** {profile.gpa if profile.gpa > 0 else 'Not set'}")
+                st.write(f"**Financial Need:** {profile.financial_need or 'Not set'}")
+                st.write(f"**Research Interests:** {', '.join(profile.research_interests) if profile.research_interests else 'Not set'}")
+                st.write(f"**Career Goals:** {profile.career_goals or 'Not set'}")
+        else:
+            st.info("No profile data yet. Start chatting to build your profile!")
 
 # Initialize session state
 if 'messages' not in st.session_state:
     st.session_state.messages = []
 
-if 'scholarship_bot' not in st.session_state:
+# Initialize or update bot when model changes
+if 'scholarship_bot' not in st.session_state or st.session_state.get('current_model') != selected_model:
     try:
         st.session_state.scholarship_bot = ScholarshipBot(
-            groq_api_key=groq_api_key,
+            groq_api_key=groq_api_key if not use_ollama else None,
+            ollama_api_key=ollama_api_key if use_ollama else None,
             tavily_api_key=tavily_api_key,
-            model_name=selected_model
+            model_name=selected_model,
+            use_ollama=use_ollama
         )
+        st.session_state.current_model = selected_model
     except Exception as e:
         st.error(f"Failed to initialize Scholarship Bot: {str(e)}")
         st.stop()
 
-# Display conversation state
+# Get bot instance
 bot = st.session_state.scholarship_bot
-state_colors = {
-    ConversationState.PROFILING: "🔍",
-    ConversationState.SEARCHING: "🔎",
-    ConversationState.RESPONDING: "💬",
-    ConversationState.COMPLETE: "✅"
-}
-
-st.info(f"**Current Phase:** {state_colors.get(bot.state, '❓')} {bot.state.value.title()}")
 
 # Display chat messages
 for message in st.session_state.messages:
@@ -107,14 +134,13 @@ for message in st.session_state.messages:
 # Initialize with welcome message
 if len(st.session_state.messages) == 0:
     welcome_msg = """
-    👋 Welcome to the Scholarship Guidance System!
-    
-    I'm your AI-powered scholarship advisor with three specialized agents:
-    - 🔍 **Profiler Agent**: Collects your academic and personal information
-    - 🔎 **Research Agent**: Searches for scholarships using live web data
-    - 💬 **Response Agent**: Provides structured recommendations and guidance
-    
-    Let's start by getting to know you better. What field of study are you interested in?
+     **Welcome to your Scholarship Assistant!**
+
+    I'm here to help you discover scholarship opportunities that match your profile.
+
+    To get started, I'll need to learn a bit about you - your field of study, education level, location, and citizenship. This information helps me find the most relevant scholarships for you.
+
+    **What field of study are you interested in?**
     """
     st.session_state.messages.append({"role": "assistant", "content": welcome_msg})
     with st.chat_message("assistant"):
@@ -126,38 +152,25 @@ if prompt := st.chat_input("Type your message here..."):
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user"):
         st.markdown(prompt)
-    
+
     # Generate response
     with st.chat_message("assistant"):
-        with st.spinner("Processing..."):
+        with st.spinner("Thinking..."):
             try:
                 # Process the message through the scholarship bot
                 response = bot.process_message(prompt)
-                
+
                 # Display response
                 st.markdown(response)
-                
+
                 # Add assistant response to chat history
                 st.session_state.messages.append({"role": "assistant", "content": response})
-                
+
             except Exception as e:
-                error_msg = f"❌ Error processing your request: {str(e)}"
+                error_msg = f"I encountered an error: {str(e)}\n\nPlease try again or rephrase your question."
                 st.error(error_msg)
                 st.session_state.messages.append({"role": "assistant", "content": error_msg})
 
-# Display system info in expander
-with st.expander("ℹ️ System Information"):
-    st.write("**Model:** ", selected_model)
-    st.write("**Conversation State:** ", bot.state.value)
-    st.write("**Profile Complete:** ", bot.user_profile.is_complete())
-    st.write("**Pending Confirmation:** ", bot.pending_confirmation)
-    st.write("**Messages in History:** ", len(st.session_state.messages))
-    
-    if bot.search_results:
-        st.write("**Search Results Available:** ✅")
-    else:
-        st.write("**Search Results Available:** ❌")
-
 # Footer
 st.markdown("---")
-st.markdown("🎓 **Scholarship Guidance System** - Powered by Multi-Agent AI Architecture")
+st.markdown(" **Tip:** Use the sidebar to switch between different AI models and view your profile.")

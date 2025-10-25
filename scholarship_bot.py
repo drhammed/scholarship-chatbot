@@ -9,6 +9,7 @@ from langchain_core.prompts import ChatPromptTemplate, HumanMessagePromptTemplat
 from langchain_core.messages import SystemMessage
 from langchain.chains.conversation.memory import ConversationBufferWindowMemory
 from langchain_groq import ChatGroq
+from langchain_ollama import ChatOllama
 from tavily import TavilyClient
 
 
@@ -55,30 +56,49 @@ class UserProfile:
 
 
 class ScholarshipBot:
-    def __init__(self, groq_api_key: str, tavily_api_key: str, model_name: str = 'llama3-70b-8192'):
+    def __init__(self, tavily_api_key: str, model_name: str = 'llama3-70b-8192',
+                 groq_api_key: Optional[str] = None, ollama_api_key: Optional[str] = None,
+                 use_ollama: bool = False):
         # Initialize APIs
-        self.groq_api_key = groq_api_key
         self.tavily_api_key = tavily_api_key
-        
-        if not self.groq_api_key:
-            raise ValueError("GROQ_API_KEY is required")
+        self.use_ollama = use_ollama
+
         if not self.tavily_api_key:
             raise ValueError("TAVILY_API_KEY is required")
-        
-        # Initialize clients
-        self.groq_chat = ChatGroq(
-            api_key=self.groq_api_key,
-            model=model_name,
-            temperature=0.02
-        )
+
+        # Initialize LLM based on provider
+        if use_ollama:
+            # Ollama Cloud requires API key for authentication
+            if not ollama_api_key:
+                raise ValueError("OLLAMA_API_KEY is required when using Ollama Cloud")
+
+            self.llm = ChatOllama(  # type: ignore
+                model=model_name,
+                temperature=0.02,
+                base_url="https://ollama.com",
+                client_kwargs={
+                    "headers": {
+                        "Authorization": f"Bearer {ollama_api_key}"
+                    }
+                }
+            )
+        else:
+            if not groq_api_key:
+                raise ValueError("GROQ_API_KEY is required when using Groq")
+            self.llm = ChatGroq(
+                api_key=groq_api_key,
+                model=model_name,
+                temperature=0.02
+            )
+
         self.tavily_client = TavilyClient(api_key=self.tavily_api_key)
-        
+
         # Initialize conversation state
         self.state = ConversationState.PROFILING
         self.user_profile = UserProfile()
         self.search_results = []
         self.pending_confirmation = None
-        
+
         # Initialize memory
         self.memory = ConversationBufferWindowMemory(
             k=10,
@@ -114,7 +134,7 @@ class ScholarshipBot:
         ])
         
         conversation = LLMChain(
-            llm=self.groq_chat,
+            llm=self.llm,
             prompt=prompt,
             verbose=False,
             memory=self.memory
@@ -232,7 +252,7 @@ class ScholarshipBot:
         ])
         
         conversation = LLMChain(
-            llm=self.groq_chat,
+            llm=self.llm,
             prompt=prompt,
             verbose=False
         )
@@ -268,13 +288,13 @@ class ScholarshipBot:
         
         try:
             conversation = LLMChain(
-                llm=self.groq_chat,
+                llm=self.llm,
                 prompt=ChatPromptTemplate.from_messages([
                     SystemMessage(content=extraction_prompt)
                 ]),
                 verbose=False
             )
-            
+
             result = conversation.predict(input="extract")
             
             # Try to parse JSON and update profile
@@ -317,13 +337,13 @@ class ScholarshipBot:
         """
         
         conversation = LLMChain(
-            llm=self.groq_chat,
+            llm=self.llm,
             prompt=ChatPromptTemplate.from_messages([
                 SystemMessage(content=support_prompt)
             ]),
             verbose=False
         )
-        
+
         response = conversation.predict(input="provide_support")
         self.state = ConversationState.COMPLETE
         
@@ -387,13 +407,13 @@ class ScholarshipBot:
         """
         
         conversation = LLMChain(
-            llm=self.groq_chat,
+            llm=self.llm,
             prompt=ChatPromptTemplate.from_messages([
                 SystemMessage(content=followup_prompt)
             ]),
             verbose=False
         )
-        
+
         return conversation.predict(input="followup")
 
     def reset_conversation(self):

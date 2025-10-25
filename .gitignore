@@ -7,3 +7,6 @@ venv/
 .env
 .venv
 __pycache__
+
+
+settings.json
