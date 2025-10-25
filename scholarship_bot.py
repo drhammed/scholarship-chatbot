@@ -422,30 +422,49 @@ class ScholarshipBot:
 
     def _handle_followup_questions(self, user_input: str) -> str:
         """Handle follow-up questions after initial scholarship search"""
-        
-        followup_prompt = f"""
-        The user has asked a follow-up question about scholarships: "{user_input}"
-        
+
+        from datetime import datetime
+        today_date = datetime.now().strftime("%B %d, %Y")
+
+        system_prompt = f"""
+        You are a Response Agent for a scholarship guidance system. The user has asked a follow-up question.
+
+        **CURRENT DATE**: {today_date}
+
         User Profile:
         {self.user_profile.to_search_context()}
-        
+
         Previous Search Results:
         {json.dumps(self.search_results, indent=2)}
-        
-        Provide a helpful response. If they're asking for more specific information about a scholarship,
-        application process, or need additional guidance, provide detailed assistance.
-        If they want to search for different scholarships, indicate that you can help with that too.
+
+        IMPORTANT INSTRUCTIONS:
+        1. If the user asks about deadlines or current/open scholarships, ALWAYS check against today's date: {today_date}
+        2. Filter out any scholarships with deadlines that have already passed
+        3. Provide specific, actionable information based on the search results
+        4. Include source URLs for any scholarships mentioned
+        5. If they want to search for different scholarships or you don't have enough information to answer, let them know you can help with a new search
+        6. Be comprehensive and specific - don't give vague responses
+
+        RESPONSE FORMAT:
+        - Use clear headers and bullet points
+        - Include scholarship names, deadlines, and source URLs
+        - For date-sensitive queries, explicitly state which scholarships are still open
         """
-        
+
+        prompt = ChatPromptTemplate.from_messages([
+            SystemMessage(content=system_prompt),
+            MessagesPlaceholder(variable_name="chat_history"),
+            HumanMessagePromptTemplate.from_template("{human_input}")
+        ])
+
         conversation = LLMChain(
             llm=self.llm,
-            prompt=ChatPromptTemplate.from_messages([
-                SystemMessage(content=followup_prompt)
-            ]),
-            verbose=False
+            prompt=prompt,
+            verbose=False,
+            memory=self.memory
         )
 
-        return conversation.predict(input="followup")
+        return conversation.predict(human_input=user_input)
 
     def reset_conversation(self):
         """Reset the conversation state"""
